@@ -9,7 +9,7 @@
     "start": "tsc && electron . --no-sandbox",
     "dist": "tsc && python3 scripts/render-icons.py && sh scripts/stage-desktop.sh && electron-builder --linux deb --publish never"
   },
-  "author": "melvincouwez-alt <301110918+melvincouwez-alt@users.noreply.github.com>",
+  "author": "Lucarne contributors <301110918+melvincouwez-alt@users.noreply.github.com>",
   "homepage": "https://github.com/melvincouwez-alt/lucarne",
   "license": "GPL-3.0-or-later",
   "type": "commonjs",
@@ -25,7 +25,7 @@
   },
   "build": {
     "appId": "io.github.melvincouwez.Lucarne",
-    "copyright": "Copyright (c) 2026 melvincouwez-alt. GPL-3.0-or-later.",
+    "copyright": "Copyright (c) 2026 Lucarne contributors. GPL-3.0-or-later.",
     "artifactName": "lucarne-${version}-${os}-${arch}.${ext}",
     "asar": true,
     "files": [
@@ -64,7 +64,7 @@
       "synopsis": "Fenêtres elementary pour les services web Microsoft 365 (projet indépendant)"
     },
     "deb": {
-      "maintainer": "melvincouwez-alt <301110918+melvincouwez-alt@users.noreply.github.com>",
+      "maintainer": "Lucarne contributors <301110918+melvincouwez-alt@users.noreply.github.com>",
       "priority": "optional",
       "recommends": [
         "pipewire-bin",

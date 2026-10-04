@@ -79,7 +79,7 @@ function symbolColour(conf: AppConfig): string {
 }
 
 /**
- * "Courrier - melvincouwez-alt - Outlook" -> Courrier / melvincouwez-alt,
+ * "Courrier - Dupont Marie - Outlook" -> Courrier / Dupont Marie,
  * "(3) Conversation | Microsoft Teams" -> Conversation, "Rapport.docx" stays.
  */
 export function splitTitle(raw: string, app: AppInfo): { title: string; subtitle: string } {

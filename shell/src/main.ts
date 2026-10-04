@@ -402,7 +402,7 @@ function about(): void {
   app.setAboutPanelOptions({
     applicationName: info.name,
     applicationVersion: app.getVersion(),
-    copyright: "© melvincouwez-alt · GPL-3.0",
+    copyright: "© Lucarne contributors · GPL-3.0",
     credits: t("Lucarne, projet indépendant sous licence GPL-3.0. {name} et Microsoft 365 sont des marques de Microsoft Corporation ; Lucarne affiche leur service web et n'est ni affilié à Microsoft ni approuvé par Microsoft.", { name: info.name }),
     iconPath: path.join(__dirname, "..", "assets", "icons", `${info.id}.png`),
   });
