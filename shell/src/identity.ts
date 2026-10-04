@@ -29,7 +29,7 @@ export const APPS: Record<AppId, AppInfo> = {
   onenote: { id: "onenote", name: "OneNote", home: "https://www.office.com/launch/onenote?auth=2",
     brand: ["#de3e80", "#bc245d", "#910e38"], documents: false },
   outlook: { id: "outlook", name: "Outlook", home: "https://outlook.office.com/mail/",
-    brand: ["#28bca3", "#0e9a83", "#007367"], documents: false },
+    brand: ["#0078d4", "#0358a7", "#032d60"], documents: false },
   teams: { id: "teams", name: "Teams", home: "https://teams.microsoft.com/v2/",
     brand: ["#a56de2", "#7239b3", "#452981"], documents: false },
   powerbi: { id: "powerbi", name: "Power BI", home: "https://app.powerbi.com/home",

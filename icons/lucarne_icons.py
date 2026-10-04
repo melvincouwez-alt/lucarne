@@ -35,6 +35,8 @@ SLATE = ("#95a3ab", "#667885", "#485a6c", "#273445", "#0e141f")
 STRAWBERRY = ("#ff8c82", "#ed5353", "#c6262e", "#a10705", "#7a0000")
 COCOA = ("#a3907c", "#8a715e", "#715344", "#57392d", "#3d211b")
 SILVER = ("#fafafa", "#d4d4d4", "#abacae", "#7e8087", "#555761")
+# Bleus de l'appli Outlook (cyan de l'enveloppe vers le bleu marine), même échelle clair → sombre
+OUTLOOK = ("#7fd8ff", "#28a8ea", "#0078d4", "#0358a7", "#032d60")
 
 
 def R(v):
@@ -312,7 +314,7 @@ def onenote(ids, s):
 # ------------------------------------------------------------ outlook : enveloppe + petit calendrier
 
 def envelope(ids, s, x, y, w, h):
-    c = MINT
+    c = OUTLOOK
     r = 1 if s <= 16 else max(1.5, R(s / 32))
     d = rrect(x, y, w, h, r)
     out = [body(ids, s, d, c[1], c[2], c[4])]
@@ -337,7 +339,7 @@ def calendar(ids, s, x, y, w, h):
     out = [body(ids, s, d, "#ffffff", "#e8e8e8", SILVER[4], hl=0)]
     hh = max(2, R(h * .28))
     hd = (f"M{x + r} {y}H{x + w - r}A{r} {r} 0 0 1 {x + w} {y + r}V{y + hh}H{x}V{y + r}A{r} {r} 0 0 1 {x + r} {y}Z")
-    out.append(body(ids, s, hd, STRAWBERRY[1], STRAWBERRY[2], STRAWBERRY[4], hl=.25, sh=False))
+    out.append(body(ids, s, hd, OUTLOOK[2], OUTLOOK[3], OUTLOOK[4], hl=.25, sh=False))
     # cases du mois
     m = max(2, R(w * .16))
     ax, ay, aw, ah = x + m, y + hh + max(1, R(h * .12)), w - 2 * m, h - hh - max(1, R(h * .12)) - m + 1
@@ -347,7 +349,7 @@ def calendar(ids, s, x, y, w, h):
     dots = []
     for i, (ry, rh) in enumerate(rows):
         for j, (cx, cw) in enumerate(cols):
-            dots.append(f'<rect x="{ax + cx}" y="{ay + ry}" width="{cw}" height="{rh}" fill="{SILVER[3] if (i, j) != (0, 1) else STRAWBERRY[2]}" '
+            dots.append(f'<rect x="{ax + cx}" y="{ay + ry}" width="{cw}" height="{rh}" fill="{SILVER[3] if (i, j) != (0, 1) else OUTLOOK[2]}" '
                         f'opacity="{.55 if (i, j) != (0, 1) else 1}"/>')
     out.append("".join(dots))
     return "".join(out)
