@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""Hôte de messagerie native Chrome, gardé ouvert par l'extension (connectNative).
+
+Rôles :
+- configuration : envoie config.json (avec la langue résolue) et la liste des applis
+  de la VM, puis les renvoie quand le fichier change ;
+- lancement : exécute `lucarne link <appli> <url> [<fichier>]` pour l'extension ;
+- réglages : écrit les quelques réglages que la fenêtre de l'extension sait changer.
+
+Tant qu'il tourne, $XDG_RUNTIME_DIR/lucarne-host.pid contient son PID : Réglages et
+`lucarne status` y voient que l'extension est connectée.
+
+Messages Chrome : 4 octets de longueur (ordre natif) + JSON UTF-8, sur stdin/stdout.
+"""
+
+import json
+import os
+import re
+import struct
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+import gi
+
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib  # noqa: E402
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import lucarne_config  # noqa: E402
+
+LUCARNE = str(HERE / "lucarne")
+MAX_MESSAGE = 1024 * 1024  # Chrome n'envoie jamais plus de 4 Go, on n'accepte pas plus d'1 Mo
+
+# Réglages que l'extension a le droit de changer, avec leurs valeurs admises.
+# Rien d'autre : passwordCommand, callCommand… sont exécutés par un shell.
+SETTABLE = {
+    "target": lambda v: v in ("web", "vm"),
+    "capture": lambda v: isinstance(v, bool),
+    "enabled": lambda v: isinstance(v, bool),
+}
+
+loop = GLib.MainLoop()
+out_lock = threading.Lock()
+
+
+def log(*a):
+    lucarne_config.append_log("host.log", time.strftime("%Y-%m-%d %H:%M:%S ") + " ".join(str(x) for x in a))
+
+
+def is_web(url):
+    return isinstance(url, str) and bool(re.match(r"^https?://[^/\s]", url, re.I))
+
+
+# ------------------------------------------------------------ canal Chrome
+
+def send(msg):
+    data = json.dumps(msg).encode()
+    with out_lock:
+        sys.stdout.buffer.write(struct.pack("=I", len(data)) + data)
+        sys.stdout.buffer.flush()
+
+
+def reader():
+    while True:
+        raw = sys.stdin.buffer.read(4)
+        if len(raw) < 4:
+            GLib.idle_add(loop.quit)
+            return
+        n = struct.unpack("=I", raw)[0]
+        if n > MAX_MESSAGE:
+            log("message trop long", n)
+            GLib.idle_add(loop.quit)
+            return
+        try:
+            msg = json.loads(sys.stdin.buffer.read(n))
+        except ValueError:
+            continue
+        if isinstance(msg, dict):
+            GLib.idle_add(handle, msg)
+
+
+def handle(msg):
+    t = msg.get("type")
+    try:
+        if t == "hello":
+            push_config()
+        elif t == "launch":
+            launch(msg)
+        elif t == "set":
+            set_value(msg)
+    except Exception as e:  # un message mal formé ne doit pas tuer l'hôte
+        log("erreur", t, repr(e))
+    return False
+
+
+def launch(msg):
+    app, url, file = msg.get("app"), msg.get("url"), msg.get("file")
+    if app not in lucarne_config.APPS:
+        log("appli refusée", app)
+        return
+    args = [LUCARNE, "link", app]
+    if url is not None:
+        if not is_web(url):
+            log("adresse refusée", app)
+            return
+        args += ["--", url] + ([file] if is_web(file) else [])
+    subprocess.Popen(args, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def set_value(msg):
+    app, key, value = msg.get("app"), msg.get("key"), msg.get("value")
+    if app not in lucarne_config.APPS or key not in SETTABLE or not SETTABLE[key](value):
+        log("réglage refusé", app, key)
+        return
+    if key == "target" and value == "vm" and app not in lucarne_config.VM_APPS:
+        return
+    # le suivi du fichier renvoie ensuite la config à l'extension
+    lucarne_config.set_value(app, key, value)
+
+
+# ------------------------------------------------------------ configuration
+
+def push_config(*_):
+    config = lucarne_config.load()
+    send({"type": "config", "config": config, "language": lucarne_config.language(config),
+          "vmApps": list(lucarne_config.VM_APPS) if lucarne_config.vm_available() else []})
+    return False
+
+
+def watch_config():
+    lucarne_config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    mon = Gio.File.new_for_path(str(lucarne_config.CONFIG)).monitor_file(Gio.FileMonitorFlags.WATCH_MOVES, None)
+    timer = [0]
+
+    def changed(*_):
+        if timer[0]:
+            GLib.source_remove(timer[0])
+
+        def fire():
+            timer[0] = 0
+            push_config()
+            return False
+        timer[0] = GLib.timeout_add(200, fire)
+    mon.connect("changed", changed)
+    return mon  # garder la référence
+
+
+# ------------------------------------------------------------ PID (extension connectée)
+
+def write_pid():
+    try:
+        lucarne_config.RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+        lucarne_config.HOST_PID.write_text(f"{os.getpid()}\n")
+    except OSError:
+        pass
+
+
+def drop_pid():
+    try:
+        if lucarne_config.HOST_PID.read_text().strip() == str(os.getpid()):
+            lucarne_config.HOST_PID.unlink()
+    except OSError:
+        pass
+
+
+def main():
+    keep = watch_config()  # noqa: F841
+    write_pid()
+    threading.Thread(target=reader, daemon=True).start()
+    try:
+        loop.run()
+    finally:
+        drop_pid()
+
+
+if __name__ == "__main__":
+    main()

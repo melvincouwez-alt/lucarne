@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'">
+<link rel="stylesheet" href="headerbar.css">
+<title>Lucarne</title>
+</head>
+<body class="loading">
+<header id="headerbar">
+  <div class="side" id="start">
+    <span class="group">
+      <button data-action="back" id="back" title="Précédent (Alt+←)" disabled></button>
+      <button data-action="forward" id="forward" title="Suivant (Alt+→)" disabled></button>
+    </span>
+    <button data-action="reload" id="reload" title="Actualiser (F5)"></button>
+    <button data-action="home" id="home" title="Accueil (Alt+Origine)"></button>
+  </div>
+  <div id="center">
+    <h1 id="title">Lucarne</h1>
+    <h2 id="subtitle" hidden></h2>
+  </div>
+  <div class="side" id="end">
+    <button data-action="stopshare" id="sharing" title="Arrêter le partage" hidden><span class="dot"></span><span id="sharing-label" data-i18n>Partage en cours</span><span class="stop" data-i18n>Arrêter</span></button>
+    <button data-action="external" id="external" title="Ouvrir dans le navigateur"></button>
+    <button data-action="menu" id="menu" title="Menu (F10)"></button>
+  </div>
+</header>
+<main id="cover">
+  <div id="splash">
+    <img id="appicon" src="" alt="" width="96" height="96">
+    <div class="spinner"></div>
+  </div>
+  <section id="error" hidden>
+    <img src="offline.svg" alt="" width="64" height="64">
+    <h1 data-i18n>Impossible de joindre Microsoft 365</h1>
+    <p data-i18n>Vérifiez la connexion à Internet, puis réessayez.</p>
+    <button data-action="retry" class="suggested" data-i18n>Réessayer</button>
+  </section>
+</main>
+<script src="headerbar.js"></script>
+</body>
+</html>

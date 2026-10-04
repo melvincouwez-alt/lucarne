@@ -1,0 +1,48 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><link rel="stylesheet" href="panel.css">
+<style>
+body{padding:14px;display:flex;flex-direction:column;gap:10px}
+ul{list-style:none;margin:0;padding:0;overflow:auto;flex:1;min-height:0;border:1px solid var(--line);border-radius:6px;background:var(--field)}
+li{padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--line)}
+li:last-child{border-bottom:0}
+li:hover,li.sel{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+li small{display:block;color:var(--dim)}
+textarea{height:80px;resize:none}
+#status{min-height:1.2em}
+</style></head>
+<body>
+<input id="q" placeholder="Rechercher une personne" autofocus>
+<ul id="list"></ul>
+<textarea id="msg" placeholder="Message" disabled></textarea>
+<div class="row"><span id="status" class="dim small" style="flex:1"></span><button id="open" disabled data-i18n>Ouvrir dans Teams</button><button id="send" class="suggested" disabled data-i18n>Envoyer</button></div>
+<script>
+const q = document.getElementById("q"), list = document.getElementById("list"), msg = document.getElementById("msg");
+const send = document.getElementById("send"), open = document.getElementById("open"), status = document.getElementById("status");
+let people = [], chosen = null, timer = 0;
+const pick = (p, li) => {
+  chosen = p;
+  for (const x of list.children) x.classList.toggle("sel", x === li);
+  msg.disabled = open.disabled = false; send.disabled = !msg.value.trim();
+  msg.focus();
+};
+const render = () => {
+  list.textContent = "";
+  for (const p of people) {
+    const li = document.createElement("li");
+    li.textContent = p.name;
+    const s = document.createElement("small"); s.textContent = [p.title, p.mail].filter(Boolean).join(" · ");
+    li.append(s); li.onclick = () => pick(p, li); list.append(li);
+  }
+};
+q.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => lucarnePanel.send({ search: q.value.trim() }), 250); });
+q.addEventListener("keydown", (e) => { if (e.key === "Enter" && people[0]) pick(people[0], list.firstChild); });
+msg.addEventListener("input", () => { send.disabled = !chosen || !msg.value.trim(); });
+msg.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !send.disabled) { e.preventDefault(); send.click(); } });
+send.onclick = () => { send.disabled = true; status.textContent = lucarnePanel.t("Envoi…"); lucarnePanel.send({ send: { mail: chosen.mail, id: chosen.id, text: msg.value } }); };
+open.onclick = () => lucarnePanel.send({ open: chosen.mail });
+addEventListener("keydown", (e) => { if (e.key === "Escape") window.close(); });
+lucarnePanel.onData((d) => {
+  if (d.results) { people = d.results; render(); status.textContent = people.length ? "" : (q.value ? lucarnePanel.t("Personne trouvée") : ""); }
+  if (d.error) { status.textContent = d.error; send.disabled = false; }
+  if (d.sent) { status.textContent = lucarnePanel.t("Envoyé à {name}", { name: chosen.name }); msg.value = ""; }
+});
+</script></body></html>

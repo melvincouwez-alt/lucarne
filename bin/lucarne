@@ -1,0 +1,351 @@
+#!/usr/bin/env python3
+"""Lucarne : ouvre les services web Microsoft 365 dans des fenêtres du bureau.
+
+Chaque appli tourne dans l'appli Electron `lucarne` (paquet .deb, dossier shell/),
+un processus par appli avec son app_id Wayland lucarne-<appli>. Sans le paquet, repli sur
+une fenêtre Chrome --app passant par une page locale (file://…/loaders/<appli>.html),
+qui donne elle aussi un app_id fixe par appli.
+
+Usage :
+  lucarne <appli> [URL]      ouvre l'appli (accueil, ou URL donnée)
+  lucarne open <URL|fichier> choisit l'appli d'après l'URL, un schéma ms-word:,
+                          msteams:, mailto:… ou un fichier local
+  lucarne link <appli> URL   lien cliqué : appli en ligne ou appli de la VM Windows,
+                          selon le réglage « target » de l'appli
+  lucarne apps               liste les applis
+  lucarne config get         réglages (JSON)
+  lucarne config set <appli> <clé> <valeur>
+                          change un réglage (ex. word target vm)
+  lucarne config set language <auto|fr|en>
+                          langue de l'interface (auto = celle du système)
+  lucarne status             état en JSON (applis, extension, Vasistas, langue)
+  lucarne which <URL|schéma> appli qui ouvrirait cette adresse (ou -)
+"""
+
+import json
+import os
+import re
+import time
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lucarne_config  # noqa: E402
+from lucarne_i18n import _  # noqa: E402
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
+
+LOADERS = Path.home() / ".local/share/lucarne/loaders"
+CHROME = shutil.which("google-chrome") or "google-chrome"
+
+APPS = {k: (v[0], v[2]) for k, v in lucarne_config.APPS.items()}
+
+EXT = {
+    "word": {"doc", "docx", "docm", "dot", "dotx", "dotm", "odt", "rtf"},
+    "excel": {"xls", "xlsx", "xlsm", "xlsb", "xlt", "xltx", "xltm", "ods", "csv"},
+    "powerpoint": {"ppt", "pptx", "pptm", "pps", "ppsx", "pot", "potx", "odp"},
+    "onenote": {"one", "onetoc2", "onepkg"},
+    "powerbi": {"pbix", "pbit"},
+}
+
+SCHEMES = {
+    "ms-word": "word", "ms-excel": "excel", "ms-powerpoint": "powerpoint",
+    "onenote": "onenote", "ms-onenote": "onenote",
+    # sans adresse web reconnaissable, ces deux-là ouvrent simplement l'appli
+    "ms-outlook": "outlook", "ms-powerbi": "powerbi",
+}
+TEAMS_HOSTS = ("teams.microsoft.com", "teams.cloud.microsoft", "teams.live.com")
+
+
+def is_web(url):
+    """Adresse http(s) avec un hôte : la seule forme passée à Electron, Chrome ou Windows."""
+    if not isinstance(url, str) or not re.match(r"^https?://", url, re.I):
+        return False
+    try:
+        return bool(urlparse(url).hostname)
+    except ValueError:
+        return False
+
+
+def app_for_url(url):
+    """Appli qui doit ouvrir cette adresse web, ou None (reste dans le navigateur)."""
+    u = urlparse(url)
+    host, path = u.hostname or "", u.path
+    q = parse_qs(u.query)
+    if re.search(r"(^|\.)outlook\.(office|office365|live|cloud\.microsoft)(\.com)?$", host) \
+            or host == "outlook.cloud.microsoft":
+        return "outlook"
+    if host in TEAMS_HOSTS:
+        return "teams"
+    if host in ("app.powerbi.com", "app.fabric.microsoft.com"):
+        return "powerbi"
+    for app in ("word", "excel", "powerpoint", "onenote"):
+        if host in (f"{app}.cloud.microsoft", f"{app}.office.com"):
+            return app
+    if host.endswith(".officeapps.live.com"):
+        # word-edit, excel.officeapps…, powerpoint.officeapps…, onenote.officeapps…
+        for app in ("word", "excel", "powerpoint", "onenote"):
+            if host.startswith(app):
+                return app
+    if host.endswith(".sharepoint.com") or host in ("onedrive.live.com", "1drv.ms"):
+        # Liens de partage : /:w:/, /:x:/, /:p:/, /:o:/ (1drv.ms : /w/, /x/…)
+        m = re.match(r"^/:?([wxpo]):?/", path)
+        if m:
+            return {"w": "word", "x": "excel", "p": "powerpoint", "o": "onenote"}[m.group(1)]
+        if re.search(r"/_layouts/15/(Doc|WopiFrame|WopiFrame2)\.aspx$", path, re.I) \
+                or (host == "onedrive.live.com" and path in ("/edit", "/edit.aspx", "/view.aspx")):
+            name = (q.get("file") or q.get("resid") or [""])[0]
+            app = app_for_name(name)
+            if app:
+                return app
+            if "wd" in q and q["wd"][0].startswith("target("):
+                return "onenote"
+            # Doc.aspx sans nom de fichier : le type est donné par le serveur, on
+            # laisse Word par défaut uniquement si « app=Word » est présent
+            appq = (q.get("app") or [""])[0].lower()
+            return appq if appq in APPS else None
+    return None
+
+
+def app_for_name(name):
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    for app, exts in EXT.items():
+        if ext in exts:
+            return app
+    return None
+
+
+def scheme_target(uri):
+    """ms-word:ofe|u|https://… → (appli, url). msteams:/l/… → (teams, url)."""
+    scheme, _, rest = uri.partition(":")
+    scheme = scheme.lower()
+    if scheme in SCHEMES:
+        parts = rest.split("|")
+        # Formes : ofe|u|URL, ofv|u|URL, nft|u|MODELE|s|DOSSIER, ou directement une URL
+        url = next((parts[i + 1] for i, p in enumerate(parts[:-1]) if p == "u"), None) \
+            or next((p for p in parts if p.startswith("http")), None)
+        return SCHEMES[scheme], url if is_web(url) else None
+    if scheme == "msteams":
+        if rest.startswith("//"):
+            # msteams://teams.microsoft.com/l/… : l'hôte est déjà dans l'adresse
+            u = urlparse("https:" + rest)
+            if (u.hostname or "") in TEAMS_HOSTS:
+                return "teams", "https:" + rest
+            return "teams", "https://teams.microsoft.com" + (u.path or "/") + (f"?{u.query}" if u.query else "")
+        return "teams", "https://teams.microsoft.com" + rest if rest.startswith("/") else None
+    if scheme == "mailto":
+        u = urlparse(uri)
+        q = {k.lower(): v[0] for k, v in parse_qs(u.query).items()}
+        params = {"to": unquote(u.path)}
+        for k in ("cc", "bcc", "subject", "body"):
+            if k in q:
+                params[k] = q[k]
+        return "outlook", "https://outlook.office.com/mail/deeplink/compose?" + urlencode(params, quote_via=quote)
+    return None, None
+
+
+def chrome(*args):
+    """Onglet ou fenêtre Chrome ; « -- » avant les adresses, qui ne deviennent jamais des options."""
+    subprocess.Popen([CHROME, *args], stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def launch(app, url=None):
+    """Appli Electron (paquet lucarne) ; à défaut, fenêtre Chrome --app.
+
+    Appli désactivée dans les réglages : simple onglet Chrome.
+    """
+    if url is not None and not is_web(url):
+        sys.exit(_("Adresse refusée (http ou https seulement) : {url}", url=url))
+    config = lucarne_config.load()
+    if not config["apps"][app]["enabled"]:
+        chrome("--", url or lucarne_config.home(app, config))
+        return
+    shell = shutil.which("lucarne-app")
+    if shell:
+        args = [shell, f"--lucarne-app={app}"] + (["--", url] if url else [])
+        subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return
+    url = url or lucarne_config.home(app, config)
+    loader = LOADERS / f"{app}.html"
+    target = loader.as_uri() + "#" + quote(url, safe="")
+    chrome(f"--app={target}")
+
+
+OFFICE_URI = {"word": "ms-word", "excel": "ms-excel", "powerpoint": "ms-powerpoint"}
+
+
+def file_url(url):
+    """Adresse web d'un document (lien de partage, Doc.aspx) → adresse du fichier lui-même,
+    seule forme qu'Office de bureau sait ouvrir. None si on ne peut pas la déduire ici
+    (l'extension la résout alors côté navigateur, avec la session SharePoint)."""
+    u = urlparse(url)
+    # lien de partage à chemin : /:x:/r/sites/X/Shared Documents/f.xlsx?d=…
+    m = re.match(r"^/:[wxpo]:/r(/.+)$", u.path)
+    if m:
+        return f"{u.scheme}://{u.netloc}{m.group(1)}"
+    # chemin direct d'un document : seulement les extensions connues (pas edit.aspx)
+    if not re.search(r"/_layouts/15/", u.path) and not u.path.startswith("/:") and app_for_name(u.path):
+        return f"{u.scheme}://{u.netloc}{u.path}"
+    return None
+
+
+def log_link(*parts):
+    lucarne_config.append_log("links.log", time.strftime("%Y-%m-%d %H:%M:%S ") + " | ".join(str(p) for p in parts))
+
+
+def open_in_vm(app, url=None, raw=None, file=None):
+    """Appli Windows de la VM Vasistas ; `raw` = adresse passée telle quelle à Windows (mailto:).
+    `file` = adresse du fichier déjà résolue par l'extension."""
+    cmd = lucarne_config.vasistas_command()
+    if not cmd:
+        notify(_("Vasistas introuvable"),
+               _("{name} s'ouvre en ligne : Vasistas n'est pas installé.", name=APPS[app][0]))
+        return False
+    if not is_web(file):
+        file = None
+    if not raw and url and app in OFFICE_URI:
+        # Office de bureau n'ouvre pas une page SharePoint : il lui faut ms-excel:ofe|u|<fichier>
+        target = file or file_url(url)
+        if target:
+            raw = f"{OFFICE_URI[app]}:ofe|u|{target}"
+        log_link("vm", app, url, file, raw)
+    if raw:
+        cmd += ["launch", raw]
+    else:
+        # Outlook de bureau ne sait pas ouvrir une adresse d'Outlook en ligne : juste l'appli
+        cmd += ["launch-app", lucarne_config.VM_APPS[app]] + ([url] if url and app != "outlook" else [])
+    subprocess.Popen(cmd, start_new_session=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return True
+
+
+def wants_vm(app):
+    return lucarne_config.load()["apps"][app]["target"] == "vm"
+
+
+def follow_link(app, url=None, raw=None, file=None):
+    """Lien cliqué (Chrome, schéma ms-word:, mailto:) : où l'ouvrir dépend du réglage de l'appli."""
+    if url is not None and not is_web(url):
+        sys.exit(_("Adresse refusée (http ou https seulement) : {url}", url=url))
+    if wants_vm(app) and open_in_vm(app, url, raw, file):
+        return
+    launch(app, url)
+
+
+def notify(title, body):
+    try:
+        subprocess.run(["notify-send", "-a", "Lucarne", "-i", "dialog-information", "--", title, body])
+    except OSError:
+        print(f"{title} : {body}", file=sys.stderr)
+
+
+def open_local(path):
+    """Fichier local : prévu pour le vrai Office de la VM Vasistas."""
+    handler = os.environ.get("LUCARNE_LOCAL_HANDLER")
+    cmd = [handler] if handler else ((lucarne_config.vasistas_command() or []) + ["open"])
+    if len(cmd) > 1 or handler:
+        subprocess.Popen(cmd + [str(path)], start_new_session=True)
+        return
+    notify(_("Fichier local non pris en charge"),
+           _("{file} : les fichiers locaux s'ouvrent dans l'Office de la VM Vasistas, "
+             "qui n'est pas installée. En attendant, déposez-le dans OneDrive ou SharePoint.", file=path.name))
+
+
+def open_any(arg):
+    if arg.startswith("file://"):
+        arg = unquote(urlparse(arg).path)
+    if not re.match(r"^[a-z][a-z0-9+.-]*:", arg, re.I):
+        p = Path(arg)
+        if p.exists():
+            return open_local(p.resolve())
+        sys.exit(_("Introuvable : {path}", path=arg))
+    if arg.lower().startswith(("http://", "https://")):
+        app = app_for_url(arg)
+        if app:
+            return follow_link(app, arg)
+        if not is_web(arg):
+            sys.exit(_("Adresse non reconnue : {url}", url=arg))
+        chrome("--", arg)
+        return
+    app, url = scheme_target(arg)
+    if app:
+        # mailto: passe tel quel à Windows (Outlook y ouvre un nouveau message)
+        raw = arg if arg.lower().startswith("mailto:") else None
+        return follow_link(app, url, raw)
+    sys.exit(_("Adresse non reconnue : {url}", url=arg))
+
+
+def status():
+    """État lisible par d'autres programmes (page « Navigateur » de Vasistas, par exemple)."""
+    ext = Path(__file__).resolve().parent.parent / "extension"
+    try:
+        manifest = json.loads((ext / "manifest.json").read_text())
+        ext_id = (ext / "ID").read_text().strip()
+    except (OSError, ValueError):
+        manifest, ext_id, ext = {}, None, None
+    return {
+        "format": 1,
+        "apps": {k: v[0] for k, v in APPS.items()},
+        "vmApps": lucarne_config.VM_APPS,
+        "vasistas": lucarne_config.vm_available(),
+        "language": lucarne_config.language(),
+        "config": str(lucarne_config.CONFIG),
+        "linksLog": str(Path.home() / ".cache/lucarne/links.log"),
+        "extension": {"path": str(ext) if ext else None, "id": ext_id, "version": manifest.get("version"),
+                      "connected": lucarne_config.host_connected()},
+    }
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "apps":
+        for k, (name, home) in APPS.items():
+            print(f"{k:11} {name:11} {home}")
+    elif cmd == "open":
+        for a in rest:
+            open_any(a)
+    elif cmd == "link" and rest and rest[0] in APPS:
+        args = rest[1:]
+        if args[:1] == ["--"]:
+            args = args[1:]
+        follow_link(rest[0], args[0] if args else None, file=args[1] if len(args) > 1 else None)
+    elif cmd == "config" and rest[:1] == ["get"]:
+        print(json.dumps(lucarne_config.load(), ensure_ascii=False, indent=2))
+    elif cmd == "config" and rest[:2] == ["set", "language"] and len(rest) == 3:
+        try:
+            lucarne_config.set_language(rest[2])
+        except ValueError:
+            sys.exit(_("Langue inconnue : {value} (auto, fr ou en)", value=rest[2]))
+    elif cmd == "config" and rest[:1] == ["set"] and len(rest) == 4:
+        app, key, value = rest[1:]
+        try:
+            value = json.loads(value)
+        except ValueError:
+            pass  # texte brut : « vm », « web »…
+        try:
+            lucarne_config.set_value(app, key, value)
+        except ValueError:
+            sys.exit(_("Réglage inconnu : {app} {key}", app=app, key=key))
+    elif cmd == "status":
+        print(json.dumps(status(), ensure_ascii=False, indent=2))
+    elif cmd == "which":
+        for a in rest:
+            print(app_for_url(a) or scheme_target(a)[0] or "-")
+    elif cmd in APPS:
+        if rest[:1] == ["--"]:
+            rest = rest[1:]
+        if rest and not rest[0].lower().startswith(("http://", "https://")):
+            # %U d'un lanceur : fichier local, ou schéma ms-word:…
+            return open_any(rest[0])
+        launch(cmd, rest[0] if rest else None)
+    else:
+        sys.exit(_("Commande inconnue : {cmd}", cmd=cmd))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

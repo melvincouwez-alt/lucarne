@@ -1,0 +1,105 @@
+{
+  "name": "lucarne",
+  "productName": "Lucarne",
+  "version": "0.5.0",
+  "description": "Services web Microsoft 365 dans des fenêtres elementary OS (projet indépendant)",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && electron . --no-sandbox",
+    "dist": "tsc && python3 scripts/render-icons.py && sh scripts/stage-desktop.sh && electron-builder --linux deb --publish never"
+  },
+  "author": "melvincouwez-alt <301110918+melvincouwez-alt@users.noreply.github.com>",
+  "homepage": "https://github.com/melvincouwez-alt/lucarne",
+  "license": "GPL-3.0-or-later",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "electron": "44.4.5",
+    "electron-builder": "^26.16.1",
+    "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "@holusion/dbus-next": "^0.11.2",
+    "cbor-x": "^1.6.6"
+  },
+  "build": {
+    "appId": "io.github.melvincouwez.Lucarne",
+    "copyright": "Copyright (c) 2026 melvincouwez-alt. GPL-3.0-or-later.",
+    "artifactName": "lucarne-${version}-${os}-${arch}.${ext}",
+    "asar": true,
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "vendor/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "native/librnnoise_ladspa.so",
+        "to": "rnnoise/librnnoise_ladspa.so"
+      },
+      {
+        "from": "build/stage/desktop",
+        "to": "desktop"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "linux": {
+      "icon": "build/icons",
+      "target": [
+        "deb"
+      ],
+      "category": "Office",
+      "executableName": "lucarne-app",
+      "desktop": {
+        "entry": {
+          "Name": "Lucarne",
+          "NoDisplay": "true",
+          "StartupWMClass": "io.github.melvincouwez.Lucarne",
+          "Icon": "lucarne-settings"
+        }
+      },
+      "synopsis": "Fenêtres elementary pour les services web Microsoft 365 (projet indépendant)"
+    },
+    "deb": {
+      "maintainer": "melvincouwez-alt <301110918+melvincouwez-alt@users.noreply.github.com>",
+      "priority": "optional",
+      "recommends": [
+        "pipewire-bin",
+        "gir1.2-granite-7.0",
+        "fido2-tools"
+      ],
+      "depends": [
+        "libgtk-3-0t64 | libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0t64 | libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "python3",
+        "python3-gi",
+        "gir1.2-gtk-4.0"
+      ],
+      "fpm": [
+        "--replaces=microsoft365-elementary",
+        "--conflicts=microsoft365-elementary",
+        "build/stage/applications/=/usr/share/applications/",
+        "build/stage/icons/=/usr/share/icons/hicolor/",
+        "build/stage/native-hosts/io.github.melvincouwez.lucarne.json=/etc/opt/chrome/native-messaging-hosts/io.github.melvincouwez.lucarne.json",
+        "build/stage/native-hosts/io.github.melvincouwez.lucarne.json=/etc/chromium/native-messaging-hosts/io.github.melvincouwez.lucarne.json"
+      ],
+      "afterInstall": "scripts/after-install.tpl",
+      "afterRemove": "scripts/after-remove.tpl"
+    }
+  },
+  "desktopName": "io.github.melvincouwez.Lucarne.desktop",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/melvincouwez-alt/lucarne.git"
+  }
+}

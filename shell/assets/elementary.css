@@ -1,0 +1,107 @@
+/* Style elementary for Microsoft's Fluent UI pages (Teams, Outlook).
+   Only Fluent's design tokens and its stable fui-* component classes are
+   used: Microsoft renames its own classes too often to target them.
+   Tokens go on top-level providers only, so the providers Microsoft inverts
+   on purpose (Teams' quick reply box) keep their own colours.
+   Everything is !important so Fluent's more specific rules do not win. */
+
+.fui-FluentProvider:not(.fui-FluentProvider .fui-FluentProvider) {
+  --borderRadiusSmall: 3px !important;
+  --borderRadiusMedium: 6px !important;
+  --borderRadiusLarge: 9px !important;
+  --borderRadiusXLarge: 12px !important;
+  --fontFamilyBase: "Inter Variable", Inter, "Open Sans", system-ui, sans-serif !important;
+  --shadow2: 0 0 0 1px rgba(0,0,0,.04), 0 1px 1px rgba(0,0,0,.08) !important;
+  --shadow4: 0 0 0 1px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.08) !important;
+  --shadow8: 0 0 0 1px rgba(0,0,0,.06), 0 3px 4px rgba(0,0,0,.12), 0 3px 3px -3px rgba(0,0,0,.28) !important;
+  --shadow16: 0 0 0 1px rgba(0,0,0,.07), 0 8px 16px rgba(0,0,0,.14), 0 6px 6px -6px rgba(0,0,0,.3) !important;
+  --shadow28: 0 0 0 1px rgba(0,0,0,.08), 0 14px 28px rgba(0,0,0,.18), 0 10px 10px -10px rgba(0,0,0,.3) !important;
+  --shadow64: 0 0 0 1px rgba(0,0,0,.08), 0 20px 48px rgba(0,0,0,.22), 0 12px 12px -12px rgba(0,0,0,.3) !important;
+}
+
+/* Light: elementary's silver palette, text in black 500. */
+html:not([class*="theme-dark"]):not([class*="theme-contrast"]) .fui-FluentProvider:not(.fui-FluentProvider .fui-FluentProvider) {
+  --colorNeutralBackground1: #ffffff !important;
+  --colorNeutralBackground2: #fafafa !important;
+  --colorNeutralBackground3: #f2f2f2 !important;
+  --colorNeutralBackground4: #ececec !important;
+  --colorNeutralBackground5: #e6e6e6 !important;
+  --colorNeutralBackground6: #e0e0e0 !important;
+  --colorNeutralBackground1Hover: #f5f5f5 !important;
+  --colorNeutralBackground1Pressed: #ebebeb !important;
+  --colorNeutralBackground1Selected: #ebebeb !important;
+  --colorSubtleBackgroundHover: rgba(0,0,0,.05) !important;
+  --colorSubtleBackgroundPressed: rgba(0,0,0,.09) !important;
+  --colorSubtleBackgroundSelected: rgba(0,0,0,.07) !important;
+  --colorNeutralStroke1: #d4d4d4 !important;
+  --colorNeutralStroke2: #e3e3e3 !important;
+  --colorNeutralStroke3: #ececec !important;
+  --colorNeutralForeground1: #333333 !important;
+  --colorNeutralForeground2: #4d4d4d !important;
+  --colorNeutralForeground3: #666666 !important;
+}
+
+/* Dark: elementary's black palette. */
+html[class*="theme-dark"] .fui-FluentProvider:not(.fui-FluentProvider .fui-FluentProvider) {
+  --colorNeutralBackground1: #333333 !important;
+  --colorNeutralBackground2: #2e2e2e !important;
+  --colorNeutralBackground3: #292929 !important;
+  --colorNeutralBackground4: #262626 !important;
+  --colorNeutralBackground5: #222222 !important;
+  --colorNeutralBackground6: #1f1f1f !important;
+  --colorNeutralBackground1Hover: #3b3b3b !important;
+  --colorNeutralBackground1Pressed: #404040 !important;
+  --colorNeutralBackground1Selected: #404040 !important;
+  --colorSubtleBackgroundHover: rgba(255,255,255,.06) !important;
+  --colorSubtleBackgroundPressed: rgba(255,255,255,.1) !important;
+  --colorSubtleBackgroundSelected: rgba(255,255,255,.08) !important;
+  --colorNeutralStroke1: #1a1a1a !important;
+  --colorNeutralStroke2: #242424 !important;
+  --colorNeutralStroke3: #2b2b2b !important;
+  --colorNeutralForeground1: #fafafa !important;
+  --colorNeutralForeground2: #d4d4d4 !important;
+  --colorNeutralForeground3: #abacae !important;
+  --shadow4: 0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.3) !important;
+  --shadow8: 0 0 0 1px rgba(0,0,0,.4), 0 3px 4px rgba(0,0,0,.3), 0 3px 3px -3px rgba(0,0,0,.5) !important;
+  --shadow16: 0 0 0 1px rgba(0,0,0,.4), 0 8px 16px rgba(0,0,0,.35), 0 6px 6px -6px rgba(0,0,0,.5) !important;
+}
+
+/* Fields: accent ring on focus, like Granite's entries. */
+.fui-Input:focus-within, .fui-Textarea:focus-within, .fui-SearchBox:focus-within, .fui-Combobox:focus-within {
+  box-shadow: 0 0 0 1px var(--colorBrandStroke1, var(--colorBrandBackground)),
+    0 0 0 3px color-mix(in srgb, var(--colorBrandBackground) 25%, transparent) !important;
+}
+
+/* Switches the size and shape of Granite's. */
+.fui-Switch__indicator { border-radius: 999px !important; }
+.fui-Checkbox__indicator { border-radius: var(--borderRadiusSmall) !important; }
+
+/* Menus: rounder, with elementary's shadow. */
+.fui-MenuPopover, .fui-PopoverSurface, .fui-DialogSurface { border-radius: var(--borderRadiusLarge) !important; }
+.fui-MenuItem { border-radius: var(--borderRadiusMedium) !important; }
+.fui-Tooltip__content { border-radius: var(--borderRadiusMedium) !important; }
+
+/* Window layout like elementary's apps: a grey frame (title bar and app
+   rail), the list and the content as rounded panels floating on it.
+   Teams' layout areas carry stable data-tid names (app-layout-area--*). */
+.fui-FluentProvider:not(.fui-FluentProvider .fui-FluentProvider) { --lucarne-chrome: #e3e3e3; --lucarne-ring: rgba(0,0,0,.09); }
+html[class*="theme-dark"] .fui-FluentProvider:not(.fui-FluentProvider .fui-FluentProvider) { --lucarne-chrome: #1f1f1f; --lucarne-ring: rgba(0,0,0,.5); }
+html:not([class*="theme-contrast"]) [data-tid="experience-layout"] { background: var(--lucarne-chrome) !important; }
+html:not([class*="theme-contrast"]) [data-tid="title-bar"],
+html:not([class*="theme-contrast"]) [data-tid="app-layout-area--nav"],
+html:not([class*="theme-contrast"]) [data-tid="app-layout-area--nav"] > * { background: transparent !important; border: 0 !important; }
+html:not([class*="theme-contrast"]) [data-tid="app-layout-area--mid-nav"] {
+  margin: 0 8px 8px 0 !important; border-radius: 12px !important; overflow: hidden !important;
+  background: var(--colorNeutralBackground2) !important;
+  box-shadow: 0 0 0 1px var(--lucarne-ring), 0 1px 3px rgba(0,0,0,.08) !important; }
+html:not([class*="theme-contrast"]) [data-tid="app-layout-area--mid-nav"] > * { border: 0 !important; background: transparent !important; }
+html:not([class*="theme-contrast"]) [data-tid="app-layout-area--header"] {
+  margin-right: 8px !important; border-radius: 12px 12px 0 0 !important; overflow: hidden !important;
+  background: var(--colorNeutralBackground1) !important; box-shadow: 0 0 0 1px var(--lucarne-ring) !important; clip-path: inset(-2px -2px 0 -2px); }
+html:not([class*="theme-contrast"]) [data-tid="app-layout-area--contextual-notifications"] { margin-right: 8px !important; background: var(--colorNeutralBackground1) !important; }
+html:not([class*="theme-contrast"]) [data-tid="app-layout-area--main"] {
+  margin: 0 8px 8px 0 !important; border-radius: 0 0 12px 12px !important; overflow: hidden !important;
+  background: var(--colorNeutralBackground1) !important;
+  box-shadow: 0 0 0 1px var(--lucarne-ring), 0 2px 4px rgba(0,0,0,.08) !important; clip-path: inset(0 -6px -6px -6px); }
+.fui-Card { border-radius: 12px !important; box-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.1), 0 2px 2px -2px rgba(0,0,0,.2) !important; transition: box-shadow .15s, transform .15s; }
+.fui-Card:hover { box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 6px 14px rgba(0,0,0,.14) !important; transform: translateY(-1px); }

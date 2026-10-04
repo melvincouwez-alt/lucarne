@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Lucarne",
+  "version": "4.1.0",
+  "description": "Opens SharePoint/OneDrive documents and Outlook, Teams and Power BI pages clicked in Chrome in the Lucarne desktop windows (or in Office in the Vasistas VM).",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvd0Ty5cqDk0tIfjePvVH/Esxy+u2xBfKwGiUnnb9tORhXLJk7lASbf++VWbkom04oYgR8J5tyf4EQUuX4aZGIMXzyrByndrEx08vG8iX+ftEjvPDHQJbcBped4U8YOTrUg/akWEvhCwfmni/s1Hf8Iul7/Uq5sB7IoNEJRrVnmlw9DRqpmr72pcIhuHpR0onJ7R2Z4GU7djNkWIeyS4NYtAr8ckrHCe90EOvxgAfLYPkABVQykL0dTlG1gMoDsb4G0QxiPfDIX7AkO3W5/yZqXhkk0wPYxZ+RZsR5WNtnBA7UAXkDcbTl+So/bVZqr89ALaxqE8IZRJ1NyrHGZHl/wIDAQAB",
+  "permissions": [
+    "webNavigation",
+    "tabs",
+    "nativeMessaging",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Lucarne",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "32": "icon32.png"
+    }
+  },
+  "icons": {
+    "32": "icon32.png",
+    "128": "icon128.png"
+  },
+  "host_permissions": [
+    "https://*.sharepoint.com/*"
+  ]
+}

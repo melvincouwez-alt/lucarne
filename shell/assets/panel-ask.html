@@ -1,0 +1,19 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><link rel="stylesheet" href="panel.css">
+<style>body{padding:20px;display:flex;flex-direction:column;gap:12px}</style></head>
+<body>
+<h1 id="t"></h1><p id="m" class="dim"></p>
+<input id="v" autofocus>
+<div class="row end"><button id="no" data-i18n>Annuler</button><button id="ok" class="suggested" data-i18n>Valider</button></div>
+<script>
+const v = document.getElementById("v");
+lucarnePanel.onData((d) => {
+  document.getElementById("t").textContent = d.title;
+  document.getElementById("m").textContent = d.message;
+  v.type = d.secret ? "password" : "text";
+  v.focus();
+});
+const ok = () => lucarnePanel.send({ ok: true, value: v.value });
+document.getElementById("ok").onclick = ok;
+document.getElementById("no").onclick = () => lucarnePanel.send({ ok: false });
+v.addEventListener("keydown", (e) => { if (e.key === "Enter") ok(); if (e.key === "Escape") lucarnePanel.send({ ok: false }); });
+</script></body></html>

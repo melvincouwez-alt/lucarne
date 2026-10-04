@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --fg: #333; --dim: #7a7a7a; --line: #e0e0e0; --accent: #3689e6; --bg: #fafafa; --seg: #ececec; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #eee; --dim: #9a9a9a; --line: #3a3a3a; --bg: #2b2b2b; --seg: #3a3a3a; }
+  }
+  body { margin: 0; width: 320px; font: 13px Inter, "Open Sans", system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 14px; font-weight: 600; margin: 0; }
+  p.hint { margin: 10px 14px 4px; color: var(--dim); font-size: 12px; line-height: 1.4; }
+  ul { list-style: none; margin: 0; padding: 4px 0 8px; }
+  li { display: flex; align-items: center; gap: 10px; padding: 6px 14px; }
+  li .name { flex: 1; }
+  li.off { opacity: .45; }
+  .seg { display: inline-flex; background: var(--seg); border-radius: 6px; padding: 2px; }
+  .seg button { border: 0; background: none; color: var(--fg); font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 4px; cursor: pointer; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .seg button:disabled { cursor: default; }
+  .warn { margin: 10px 14px; color: #c6262e; font-size: 12px; }
+  input[type=checkbox] { accent-color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Lucarne</h1>
+  <input type="checkbox" id="enabled">
+</header>
+<p class="hint" id="hint"></p>
+<div id="warn" class="warn" hidden></div>
+<ul id="apps"></ul>
+<script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>@NAME@</title>
+<meta name="theme-color" content="@C2@">
+<link rel="icon" href="@ICON@">
+<style>
+html, body { height: 100%; margin: 0; }
+body { display: grid; place-items: center; color: #fff; font: 13px "Inter", system-ui, sans-serif;
+  background: radial-gradient(120% 90% at 50% 0%, @C1@ 0%, @C2@ 55%, @C3@ 100%); }
+.in { display: grid; justify-items: center; gap: 12px; }
+img { width: 112px; height: 112px; filter: drop-shadow(0 8px 18px rgba(0,0,0,.35)); }
+.n { font-size: 22px; font-weight: 700; }
+.s { display: flex; align-items: center; gap: 8px; opacity: .85; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+  animation: r .9s linear infinite; }
+@keyframes r { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style></head>
+<body><div class="in"><img src="@ICON@" alt=""><div class="n">@NAME@</div>
+<div class="s"><span class="spin"></span>Connexion…</div></div>
+<script>
+// Page d'amorce : l'app_id Wayland de la fenêtre dépend de cette adresse fixe,
+// la vraie destination arrive dans le fragment (#URL encodée). On laisse
+// l'écran s'afficher avant de partir : Chrome le garde jusqu'à la page suivante.
+// Seule une adresse https:// est suivie (jamais javascript:, file:, data:…).
+var t = "@HOME@";
+try {
+  if (location.hash.length > 1) t = decodeURIComponent(location.hash.slice(1));
+  if (!/^https:\/\/[^\/\s]/i.test(t) || new URL(t).protocol !== "https:") t = "@HOME@";
+} catch (e) { t = "@HOME@"; }
+requestAnimationFrame(function () { requestAnimationFrame(function () { location.replace(t); }); });
+</script></body></html>

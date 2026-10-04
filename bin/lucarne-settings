@@ -1,0 +1,462 @@
+#!/usr/bin/env python3
+"""Réglages de Lucarne : une fenêtre elementary (GTK 4 + Granite) pour config.json."""
+
+import shutil
+import subprocess
+import sys
+import sysconfig
+import time
+from pathlib import Path
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Granite", "7.0")
+from gi.repository import Gio, GLib, Granite, Gtk  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lucarne_config as mc  # noqa: E402
+import lucarne_i18n  # noqa: E402
+from lucarne_i18n import _  # noqa: E402
+
+APP_ID = "io.github.melvincouwez.Lucarne.Settings"
+EXTENSION_DIR = Path(__file__).resolve().parent.parent / "extension"
+
+# (clé, titre, explication, applis concernées ou None pour toutes[, genre])
+# Genre : "switch" (défaut), "text", "list" (liste séparée par des virgules), "number" (Mo).
+# "#" comme clé : en-tête de section. Les textes sont en français, traduits à l'affichage
+# par _() (bin/lucarne_i18n.py) ; {name} = nom de l'appli, {app} = son identifiant.
+OPTIONS = [
+    ("capture", "Ouvrir les liens ici",
+     "Les liens {name} cliqués dans Chrome s'ouvrent dans cette appli au lieu d'un onglet", None),
+    ("badge", "Non-lus dans le dock", "Pastille avec le nombre de messages non lus", mc.BADGE_CAPABLE),
+    ("notify", "Notifications au nom de l'appli",
+     "Les alertes s'affichent avec l'icône {name}, réglables dans Paramètres › Notifications", None),
+    ("noise", "Micro antibruit",
+     "Réunions : le bruit de fond du micro est retiré par RNNoise avant d'arriver dans {name}", mc.NOISE_CAPABLE),
+    ("calls", "Appels entrants en notification",
+     "Répondre, répondre en vidéo ou refuser depuis la bulle, même fenêtre fermée", {"teams"}),
+    ("presence", "Rester « Disponible » quand je travaille ailleurs",
+     "{name} ne voit que l'activité dans sa fenêtre ; celle du reste de la session lui est transmise", {"teams"}),
+    ("awayIdle", "Passer « Absent » quand la session est verrouillée",
+     "Ou après 5 minutes sans clavier ni souris, sauf pendant un appel", {"teams"}),
+    ("theme", "Thème clair ou sombre selon le système", "", {"teams"}),
+    ("banners", "Bannières de {name} en notifications du système",
+     "Nouveau message, arrivée en réunion… sortent de la fenêtre au lieu de s'y afficher", {"teams"}),
+    ("background", "Continuer après la fermeture de la fenêtre",
+     "Appels et notifications continuent d'arriver ; rouvrir depuis le dock, quitter avec Ctrl+Q", {"teams"}),
+    ("#", "Appels et partage", "", {"teams"}),
+    ("callWindow", "Appel entrant dans une petite fenêtre",
+     "Photo de l'appelant et gros boutons ; sinon une notification", {"teams"}),
+    ("callCommand", "Commande pendant la sonnerie",
+     "Lancée par sh quand un appel sonne : $1 = appelant, $2 = texte de l'appel. Vide = rien", {"teams"}, "text"),
+    ("miniWindow", "Réunion dans une petite fenêtre à part",
+     "Quand tu vas ailleurs dans {name} pendant une réunion, comme sous Windows ; la punaise la garde au-dessus", {"teams"}),
+    ("sharePreview", "Aperçu de ce que je partage",
+     "Petite fenêtre avec l'écran partagé et un bouton Arrêter", {"teams"}),
+    ("#", "Micro et caméra", "", {"teams"}),
+    ("autoGain", "Gain automatique du micro",
+     "Chromium monte le volume du micro tout seul ; coupé, ta voix ne peut plus saturer", {"teams"}),
+    ("cameraRatio", "Caméra non déformée en changeant d'écran", "", {"teams"}),
+    ("cameraFull", "Caméra en pleine résolution", "Au lieu du 720p que demande {name}", {"teams"}),
+    ("ignoreSystemMute", "Ignorer la coupure du micro faite par le système",
+     "{name} ne recopie plus sur son bouton une coupure faite ailleurs", {"teams"}),
+    ("lockDevices", "Garder le micro et la caméra choisis",
+     "Brancher un casque ou une webcam en cours d'appel ne change rien", {"teams"}),
+    ("#", "Affichage", "", None),
+    ("tint", "Barre d'en-tête à la couleur de l'appli",
+     "Sinon, barre neutre comme les applis du système", None),
+    ("style", "Police et accent elementary",
+     "Police Inter, couleur d'accent du système et barres de défilement fines dans les pages", None),
+    ("autostart", "Lancer à l'ouverture de session", "", None),
+    ("#", "Avancé", "", None),
+    ("elementaryCss", "Style elementary",
+     "Cadre gris et panneaux arrondis à la façon d'elementary dans {name}", {"teams", "outlook"}),
+    ("customCss", "Mon style (CSS)", "Fichier ~/.config/lucarne/{app}.css ajouté aux pages", None),
+    ("backgrounds", "Mes fonds d'écran d'appel",
+     "Images du dossier ~/.config/lucarne/backgrounds à la place de ceux de Microsoft", {"teams"}),
+    ("windowsMode", "Se présenter comme Windows",
+     "Certaines fonctions de Microsoft ne s'affichent que sous Windows ; à tester si l'une manque", None),
+    ("cacheLimit", "Taille maximale du cache (Mo)",
+     "Au-delà, le cache de {name} est vidé au démarrage ; 0 = jamais", None, "number"),
+    ("#", "Entreprise", "", None),
+    ("intune", "Appareil géré par Intune",
+     "Connexion par Microsoft Identity Broker (paquet intune-portal requis)", None),
+    ("intuneUser", "Compte Intune", "Vide = le premier compte connu du broker", None, "text"),
+    ("webauthn", "Clés de sécurité FIDO2",
+     "YubiKey et autres à la connexion Microsoft (paquet fido2-tools requis)", None),
+    ("proxy", "Proxy", "Par exemple http://proxy:3128 ; vide = réglage du système", None, "text"),
+    ("caFingerprints", "Certificats d'entreprise de confiance",
+     "Empreintes SHA-256 des certificats racine, séparées par des virgules", None, "list"),
+    ("loginUser", "Adresse de connexion", "Remplie d'office sur la page de connexion Microsoft", None, "text"),
+    ("passwordCommand", "Commande du mot de passe",
+     "Par exemple « pass show travail » ; le mot de passe est rempli, jamais envoyé seul", None, "text"),
+]
+
+LANGUAGES = ("auto", "fr", "en")
+
+
+def row(title, subtitle, widget):
+    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12, margin_top=6, margin_bottom=6)
+    labels = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True, valign=Gtk.Align.CENTER)
+    t = Gtk.Label(label=title, xalign=0, wrap=True)
+    labels.append(t)
+    if subtitle:
+        s = Gtk.Label(label=subtitle, xalign=0, wrap=True)
+        s.add_css_class(Granite.STYLE_CLASS_DIM_LABEL)
+        s.add_css_class(Granite.STYLE_CLASS_SMALL_LABEL)
+        labels.append(s)
+    widget.set_valign(Gtk.Align.CENTER)
+    box.append(labels)
+    box.append(widget)
+    return box
+
+
+def on_commit(entry, callback):
+    """Entrée validée par Entrée ou en quittant le champ."""
+    entry.connect("activate", lambda *_a: callback())
+    focus = Gtk.EventControllerFocus()
+    focus.connect("leave", lambda *_a: callback())
+    entry.add_controller(focus)
+
+
+def lucarne_command():
+    return shutil.which("lucarne") or str(Path(__file__).resolve().parent / "lucarne")
+
+
+def eds_has_microsoft365():
+    """Module Microsoft 365 d'evolution-ews présent (dossier multiarch, quel que soit l'arch)."""
+    roots = []
+    multiarch = sysconfig.get_config_var("MULTIARCH")
+    if multiarch:
+        roots.append(Path("/usr/lib") / multiarch / "evolution-data-server")
+    roots += sorted(Path("/usr/lib").glob("*/evolution-data-server")) + [Path("/usr/lib/evolution-data-server"),
+                                                                        Path("/usr/lib64/evolution-data-server")]
+    seen = set()
+    for root in roots:
+        if root in seen or not root.is_dir():
+            continue
+        seen.add(root)
+        if any(root.glob("**/*microsoft365*")):
+            return True
+    return False
+
+
+class Window(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Lucarne", default_width=820, default_height=600,
+                         icon_name="lucarne-settings")
+        self.config = mc.load()
+        lucarne_i18n.refresh(self.config)
+        header = Gtk.HeaderBar()
+        header.add_css_class(Granite.STYLE_CLASS_FLAT)
+        self.set_titlebar(header)
+        self.build("general")
+        # config.json changé ailleurs (fenêtre de l'extension, appli, `lucarne config set`) :
+        # l'interface est reconstruite avec les nouvelles valeurs
+        mc.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        self.monitor = Gio.File.new_for_path(str(mc.CONFIG)).monitor_file(Gio.FileMonitorFlags.WATCH_MOVES, None)
+        self.monitor.connect("changed", self.on_file_changed)
+        self.reload_timer = 0
+
+    # ---------------------------------------------------------------- données
+
+    def cfg(self, app):
+        return self.config["apps"][app]
+
+    def set(self, app, key, value):
+        """Change une seule clé : le fichier est relu, les autres réglages restent tels quels."""
+        if self.cfg(app).get(key) == value:
+            return
+        self.cfg(app)[key] = value
+        mc.set_value(app, key, value)
+
+    def on_file_changed(self, *_):
+        if self.reload_timer:
+            GLib.source_remove(self.reload_timer)
+        self.reload_timer = GLib.timeout_add(300, self.reload)
+
+    def reload(self):
+        self.reload_timer = 0
+        new = mc.load()
+        if new != self.config:
+            self.config = new
+            lucarne_i18n.refresh(new)
+            self.build(self.stack.get_visible_child_name())
+        return False
+
+    # ---------------------------------------------------------------- interface
+
+    def build(self, visible="general"):
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE, hexpand=True)
+        side = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
+        side.add_css_class("sidebar")
+        side.connect("row-selected", lambda lb, r: r and self.stack.set_visible_child_name(r.get_name()))
+
+        self.side_rows = {}
+        self.stack.add_named(self.general_page(), "general")
+        self.side_rows["general"] = self.side_row("general", _("Général"), "preferences-system")
+        side.append(self.side_rows["general"])
+        for app, (name, generic, _home) in mc.APPS.items():
+            self.side_rows[app] = self.side_row(app, name, f"lucarne-{app}")
+            side.append(self.side_rows[app])
+            self.stack.add_named(self.app_page(app), app)
+
+        scroll_side = Gtk.ScrolledWindow(child=side, hscrollbar_policy=Gtk.PolicyType.NEVER, width_request=190)
+        paned = Gtk.Paned(start_child=scroll_side, end_child=self.stack, position=190,
+                          shrink_start_child=False, resize_start_child=False)
+        self.set_child(paned)
+        side.select_row(self.side_rows.get(visible) or self.side_rows["general"])
+
+    def side_row(self, name, label, icon):
+        r = Gtk.ListBoxRow(name=name)
+        b = Gtk.Box(spacing=8, margin_start=10, margin_end=10, margin_top=6, margin_bottom=6)
+        b.append(Gtk.Image(icon_name=icon, pixel_size=24))
+        b.append(Gtk.Label(label=label, xalign=0))
+        r.set_child(b)
+        return r
+
+    def page(self, icon, title, subtitle):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_start=24, margin_end=24,
+                      margin_top=18, margin_bottom=24)
+        head = Gtk.Box(spacing=12, margin_bottom=12)
+        head.append(Gtk.Image(icon_name=icon, pixel_size=48))
+        tb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+        t = Gtk.Label(label=title, xalign=0)
+        t.add_css_class(Granite.STYLE_CLASS_H2_LABEL)
+        s = Gtk.Label(label=subtitle, xalign=0)
+        s.add_css_class(Granite.STYLE_CLASS_DIM_LABEL)
+        tb.append(t)
+        tb.append(s)
+        head.append(tb)
+        box.append(head)
+        return box
+
+    def app_page(self, app):
+        name, generic, default_home = mc.APPS[app]
+        c = self.cfg(app)
+        box = self.page(f"lucarne-{app}", name, _(generic))
+
+        box.append(Granite.HeaderLabel.new(_("Appli")))
+        on = Gtk.Switch(active=c["enabled"])
+        box.append(row(_("Activer {name}", name=name),
+                       _("Désactivée, le lanceur et les liens {name} s'ouvrent dans un onglet Chrome", name=name), on))
+        menu = Gtk.Switch(active=c["menu"])
+        box.append(row(_("Afficher dans le menu Applications"),
+                       _("Sinon, le lanceur reste utilisable depuis le dock et les liens"), menu))
+        # Tout ce qui suit ne sert que si l'appli est activée
+        rest = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        side = self.side_rows[app]
+
+        def sync():
+            enabled = self.cfg(app)["enabled"]
+            menu.set_sensitive(enabled)
+            rest.set_sensitive(enabled)
+            side.set_opacity(1 if enabled else 0.5)
+        sync()
+
+        def set_flag(s, _p, key):
+            self.set(app, key, s.get_active())
+            mc.apply(app, self.config)
+            sync()
+        on.connect("notify::active", set_flag, "enabled")
+        menu.connect("notify::active", set_flag, "menu")
+
+        if app in mc.VM_APPS and mc.vm_available():
+            targets = ["web", "vm"]
+            target = Gtk.DropDown.new_from_strings([_("Appli en ligne"), _("VM Windows (Vasistas)")])
+            target.set_selected(targets.index(c["target"]))
+            target.connect("notify::selected", lambda d, _p: self.set(app, "target", targets[d.get_selected()]))
+            box.append(row(_("Ouvrir les liens dans"),
+                           _("Liens {name} cliqués dans Chrome ou dans d'autres applis", name=name), target))
+        box.append(rest)
+        outer, box = box, rest
+
+        box.append(Granite.HeaderLabel.new(_("Page d'accueil")))
+        entry = Gtk.Entry(text=c["home"], placeholder_text=default_home, hexpand=True)
+        on_commit(entry, lambda: self.set(app, "home", entry.get_text().strip()))
+        hint = Gtk.Label(label=_("Vide = accueil par défaut. Colle ici l'adresse de la page que tu ouvres d'habitude."),
+                         xalign=0, wrap=True)
+        hint.add_css_class(Granite.STYLE_CLASS_DIM_LABEL)
+        hint.add_css_class(Granite.STYLE_CLASS_SMALL_LABEL)
+        box.append(entry)
+        box.append(hint)
+
+        box.append(Granite.HeaderLabel.new(_("Comportement")))
+        for key, title, sub, only, *kind in OPTIONS:
+            kind = kind[0] if kind else "switch"
+            if only is not None and app not in only:
+                continue
+            if key == "#":
+                box.append(Granite.HeaderLabel.new(_(title)))
+                continue
+            title_t = _(title, name=name, app=app)
+            sub_t = _(sub, name=name, app=app) if sub else ""
+            box.append(row(title_t, sub_t, self.option_widget(app, key, kind)))
+        if app == "teams":
+            self.accounts(box, app)
+
+        open_btn = Gtk.Button(label=_("Ouvrir {name}", name=name), halign=Gtk.Align.START, margin_top=12)
+        open_btn.add_css_class("suggested-action")
+        open_btn.connect("clicked", lambda *_a: subprocess.Popen([lucarne_command(), app], start_new_session=True))
+        box.append(open_btn)
+        return Gtk.ScrolledWindow(child=outer, hscrollbar_policy=Gtk.PolicyType.NEVER)
+
+    def option_widget(self, app, key, kind):
+        value = self.cfg(app)[key]
+        if kind == "switch":
+            sw = Gtk.Switch(active=bool(value))
+
+            def toggled(s, _p):
+                self.set(app, key, s.get_active())
+                if key == "autostart":
+                    mc.apply(app, self.config)
+            sw.connect("notify::active", toggled)
+            return sw
+        if kind == "number":
+            spin = Gtk.SpinButton.new_with_range(0, 100000, 50)
+            spin.set_value(float(value or 0))
+            spin.connect("value-changed", lambda s: self.set(app, key, int(s.get_value())))
+            return spin
+        entry = Gtk.Entry(text=", ".join(value) if isinstance(value, list) else str(value), hexpand=True)
+        if kind == "list":
+            on_commit(entry, lambda: self.set(app, key, [t.strip() for t in entry.get_text().split(",") if t.strip()]))
+        else:
+            on_commit(entry, lambda: self.set(app, key, entry.get_text().strip()))
+        return entry
+
+    def accounts(self, box, app):
+        box.append(Granite.HeaderLabel.new(_("Comptes Teams")))
+        hint = Gtk.Label(xalign=0, wrap=True, label=_("Chaque compte a sa fenêtre et sa connexion. "
+                                                      "Ctrl+Alt+1 ouvre le compte principal, Ctrl+Alt+2 à 5 les suivants."))
+        hint.add_css_class(Granite.STYLE_CLASS_DIM_LABEL)
+        hint.add_css_class(Granite.STYLE_CLASS_SMALL_LABEL)
+        box.append(hint)
+        rows = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.append(rows)
+
+        def profiles():
+            return [dict(p) for p in self.cfg(app)["profiles"] if isinstance(p, dict)]
+
+        def refresh():
+            while (child := rows.get_first_child()) is not None:
+                rows.remove(child)
+            for i, p in enumerate(profiles()):
+                name = Gtk.Entry(text=p.get("name", ""), hexpand=True)
+
+                def rename(i=i, name=name):
+                    ps = profiles()
+                    if i < len(ps):
+                        ps[i]["name"] = name.get_text().strip() or _("Compte {n}", n=i + 2)
+                        self.set(app, "profiles", ps)
+                on_commit(name, rename)
+                remove = Gtk.Button(icon_name="edit-delete-symbolic", tooltip_text=_("Retirer ce compte"))
+                remove.add_css_class("flat")
+
+                def drop(*_a, i=i):
+                    ps = profiles()
+                    if i < len(ps):
+                        del ps[i]
+                        self.set(app, "profiles", ps)
+                    refresh()
+                remove.connect("clicked", drop)
+                line = Gtk.Box(spacing=8)
+                line.append(Gtk.Label(label=f"Ctrl+Alt+{i + 2}" if i < 4 else "", width_chars=10, xalign=0))
+                line.append(name)
+                line.append(remove)
+                rows.append(line)
+
+        add = Gtk.Button(label=_("Ajouter un compte"), halign=Gtk.Align.START)
+
+        def new(*_a):
+            ps = profiles()
+            ps.append({"id": format(int(time.time() * 1000), "x"), "name": _("Compte {n}", n=len(ps) + 2)})
+            self.set(app, "profiles", ps)
+            refresh()
+        add.connect("clicked", new)
+        refresh()
+        box.append(add)
+
+    def language_row(self, box):
+        box.append(Granite.HeaderLabel.new("Langue / Language"))
+        drop = Gtk.DropDown.new_from_strings([_("Automatique (langue du système)"), "Français", "English"])
+        current = self.config.get("language", "auto")
+        drop.set_selected(LANGUAGES.index(current) if current in LANGUAGES else 0)
+
+        def changed(d, _p):
+            value = LANGUAGES[d.get_selected()]
+            if value == self.config.get("language", "auto"):
+                return
+            self.config["language"] = value
+            mc.set_language(value)
+            lucarne_i18n.refresh(self.config)
+            # reconstruire hors du signal : la liste déroulante elle-même est remplacée
+            GLib.idle_add(lambda: self.build("general") or False)
+        drop.connect("notify::selected", changed)
+        box.append(row(_("Langue de Lucarne"), _("Réglages, notifications et fenêtre de l'extension Chrome"), drop))
+
+    def general_page(self):
+        box = self.page("lucarne-settings", "Lucarne", _("Services web Microsoft 365 dans des fenêtres du bureau"))
+        self.language_row(box)
+        box.append(Granite.HeaderLabel.new(_("Extension Chrome")))
+        ok = mc.host_connected()
+        state = Gtk.Label(xalign=0, wrap=True, label=(
+            _("Connectée : les liens Word, Excel, Teams… cliqués dans Chrome s'ouvrent dans les applis.") if ok else
+            _("Pas connectée. Elle sert à ouvrir dans les applis les liens Word, Excel, Teams… cliqués dans Chrome. "
+              "Pour l'ajouter : chrome://extensions, mode développeur, « Charger l'extension non empaquetée », "
+              "puis choisir le dossier ci-dessous.")))
+        box.append(state)
+        path = Gtk.Label(label=str(EXTENSION_DIR), xalign=0, selectable=True)
+        path.add_css_class(Granite.STYLE_CLASS_DIM_LABEL)
+        box.append(path)
+        btns = Gtk.Box(spacing=8, margin_top=6)
+        b1 = Gtk.Button(label=_("Ouvrir la page des extensions"))
+        b1.connect("clicked", lambda *_a: subprocess.Popen(
+            [shutil.which("google-chrome") or shutil.which("chromium") or "google-chrome", "chrome://extensions"],
+            start_new_session=True))
+        b2 = Gtk.Button(label=_("Ouvrir le dossier"))
+        b2.connect("clicked", lambda *_a: Gio.AppInfo.launch_default_for_uri(EXTENSION_DIR.as_uri(), None))
+        btns.append(b1)
+        btns.append(b2)
+        box.append(btns)
+
+        box.append(Granite.HeaderLabel.new(_("Agenda Outlook")))
+        eds = shutil.which("evolution")
+        backend = eds_has_microsoft365()
+        cal = Gtk.Label(xalign=0, wrap=True, label=(
+            _("Module Microsoft 365 installé. Ajoute le compte dans Evolution (Fichier › Nouveau › Compte "
+              "de collaboration › Microsoft 365) : l'heure du panneau et Agenda affichent ensuite les rendez-vous.")
+            if backend else
+            _("Module Microsoft 365 absent. Installe-le avec : sudo apt install evolution evolution-ews")))
+        box.append(cal)
+        if backend and eds:
+            b3 = Gtk.Button(label=_("Ouvrir Evolution"), halign=Gtk.Align.START, margin_top=6)
+            b3.connect("clicked", lambda *_a: subprocess.Popen(["evolution"], start_new_session=True))
+            box.append(b3)
+
+        return Gtk.ScrolledWindow(child=box, hscrollbar_policy=Gtk.PolicyType.NEVER)
+
+
+class App(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        Granite.init()
+        gs = Granite.Settings.get_default()
+        gtk = Gtk.Settings.get_default()
+
+        def follow(*_):
+            gtk.set_property("gtk-application-prefer-dark-theme",
+                             gs.get_property("prefers-color-scheme") == Granite.SettingsColorScheme.DARK)
+        follow()
+        gs.connect("notify::prefers-color-scheme", follow)
+
+    def do_activate(self):
+        win = self.get_active_window() or Window(self)
+        win.present()
+
+
+if __name__ == "__main__":
+    sys.exit(App().run(sys.argv))

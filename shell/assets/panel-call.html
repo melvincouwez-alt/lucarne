@@ -1,0 +1,27 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><link rel="stylesheet" href="panel.css">
+<style>
+body{padding:18px;display:flex;flex-direction:column;gap:14px;justify-content:space-between}
+.who{display:flex;gap:14px;align-items:center}
+.pic{width:56px;height:56px;border-radius:50%;background:var(--accent) center/cover;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:20px}
+.pic.ring{animation:ring 1.4s ease-in-out infinite}
+@keyframes ring{0%,100%{box-shadow:0 0 0 0 rgba(104,183,35,.5)}50%{box-shadow:0 0 0 9px rgba(104,183,35,0)}}
+.row button{flex:1}
+</style></head>
+<body>
+<div class="who"><div id="pic" class="pic ring"></div><div><h1 id="caller" data-i18n>Appel entrant</h1><p id="text" class="dim small">Teams</p></div></div>
+<div class="row">
+  <button id="decline" class="decline" title="Refuser" data-i18n>Refuser</button>
+  <button id="audio" class="accept" title="Répondre avec le micro seul" data-i18n>Répondre</button>
+  <button id="video" class="accept" title="Répondre avec la caméra" data-i18n>Vidéo</button>
+</div>
+<script>
+const initials = (s) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+lucarnePanel.onData((d) => {
+  document.getElementById("caller").textContent = d.caller || lucarnePanel.t("Appel entrant");
+  document.getElementById("text").textContent = d.text || "Teams";
+  const pic = document.getElementById("pic");
+  if (d.image) { pic.style.backgroundImage = "url(" + JSON.stringify(d.image) + ")"; pic.textContent = ""; }
+  else pic.textContent = initials(d.caller || "?");
+});
+for (const id of ["decline", "audio", "video"]) document.getElementById(id).onclick = () => lucarnePanel.send({ answer: id });
+</script></body></html>

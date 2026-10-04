@@ -1,0 +1,163 @@
+/* Lucarne header bar: elementary's HeaderBar, either in the app's brand
+   colour with white glyphs (body.tint, the default, as Reddit and Cassette do)
+   or neutral like the system's own apps. The window buttons are the frame's
+   own and float over the titlebar-area padding (Window Controls Overlay).
+   --app-* are set from the window state by headerbar.js. */
+:root {
+  --app-top: #3689e6;
+  --app-bottom: #0d52bf;
+  --app-edge: #002e99;
+  /* neutral bar */
+  --bar-top: #f6f6f6;
+  --bar-bottom: #e4e4e4;
+  --bar-edge: rgba(0, 0, 0, 0.18);
+  --bar-text: #333333;
+  --bar-hover: rgba(0, 0, 0, 0.07);
+  --bar-press: rgba(0, 0, 0, 0.13);
+  --page: #fafafa;
+  --text: #333333;
+  --dim: rgba(0, 0, 0, 0.55);
+  --spinner-track: rgba(0, 0, 0, 0.08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bar-top: #3a3a3a;
+    --bar-bottom: #2e2e2e;
+    --bar-edge: rgba(0, 0, 0, 0.55);
+    --bar-text: #fafafa;
+    --bar-hover: rgba(255, 255, 255, 0.08);
+    --bar-press: rgba(0, 0, 0, 0.2);
+    --page: #1f1f1f;
+    --text: #e8e8e8;
+    --dim: rgba(255, 255, 255, 0.6);
+    --spinner-track: rgba(255, 255, 255, 0.1);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--page); }
+body {
+  font: 400 12px/1.2 "Inter Variable", "Inter", system-ui, sans-serif;
+  font-feature-settings: "ss03", "cv11";
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+#headerbar {
+  position: relative;
+  z-index: 1;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 6px) 0 calc(env(titlebar-area-x, 0px) + 6px);
+  color: var(--bar-text);
+  background: linear-gradient(var(--bar-top), var(--bar-bottom));
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 0 var(--bar-edge);
+  -webkit-app-region: drag;
+  --hover: var(--bar-hover);
+  --press: var(--bar-press);
+}
+body.tint #headerbar {
+  color: #ffffff;
+  background: linear-gradient(var(--app-top), var(--app-bottom));
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 0 var(--app-edge);
+  --hover: rgba(255, 255, 255, 0.16);
+  --press: rgba(0, 0, 0, 0.14);
+}
+@media (prefers-color-scheme: dark) {
+  /* Brand bars sit a little deeper in the dark style, as elementary's own do. */
+  body.tint #headerbar { background: linear-gradient(var(--app-bottom), var(--app-edge)); box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 0 rgba(0, 0, 0, 0.6); }
+}
+.side { flex: 1 1 0; min-width: max-content; display: flex; align-items: center; gap: 6px; }
+#end { justify-content: flex-end; }
+.group { display: flex; gap: 2px; }
+#center { flex: 0 1 auto; min-width: 0; max-width: 60%; display: flex; flex-direction: column; align-items: center; }
+body.tint #center { text-shadow: 0 1px rgba(0, 0, 0, 0.25); }
+#title, #subtitle { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#title { font-size: 12px; font-weight: 700; }
+#subtitle { font-size: 11px; font-weight: 400; opacity: 0.8; margin-top: 1px; }
+#subtitle[hidden] { display: none; }
+#headerbar button {
+  -webkit-app-region: no-drag;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.92;
+  transition: background-color 120ms ease, opacity 120ms ease;
+}
+#headerbar button:hover { background: var(--hover); opacity: 1; }
+#headerbar button:active { background: var(--press); }
+#headerbar button:disabled { opacity: 0.3; background: transparent; }
+#headerbar button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+button svg { width: 16px; height: 16px; fill: currentColor; }
+button svg.stroke { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (max-width: 600px) { #home, #external { display: none; } }
+
+/* Under the bar: the app's icon and elementary's spinner until the page has
+   drawn, or the offline page. The Microsoft view covers it once shown. */
+#cover {
+  position: absolute;
+  inset: 48px 0 0 0;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+#splash { display: grid; justify-items: center; gap: 22px; }
+#appicon { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18)); }
+#appicon[src=""] { visibility: hidden; }
+.spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2.5px solid var(--spinner-track);
+  border-top-color: var(--app-bottom);
+  animation: spin 0.9s linear infinite;
+}
+body.failed #splash, body:not(.loading) #splash { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#error { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 24px; max-width: 420px; }
+#error[hidden] { display: none; }
+#error img { margin-bottom: 12px; opacity: 0.9; }
+#error h1 { font-size: 24px; font-weight: 300; }
+#error p { font-size: 14px; color: var(--dim); margin-bottom: 18px; }
+.suggested {
+  font: inherit; font-size: 13px; font-weight: 600;
+  padding: 7px 16px; border-radius: 6px; border: 0;
+  color: #fff;
+  background: linear-gradient(var(--app-top), var(--app-bottom));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.2), 0 0 0 1px var(--app-edge), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.suggested:hover { filter: brightness(1.06); }
+.suggested:active { filter: brightness(0.94); }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 3s; }
+  button { transition: none; }
+}
+/* Screen sharing in progress: red pill with a stop label, readable on the
+   tinted bar and the neutral one alike */
+#headerbar button#sharing {
+  display: flex;
+  align-items: center;
+  width: auto;
+  gap: 6px;
+  padding: 0 10px;
+  color: #fff;
+  opacity: 1;
+  background: #c6262e;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+}
+#headerbar button#sharing[hidden] { display: none; }
+#headerbar button#sharing:hover { background: #d63a42; }
+#sharing .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: pulse 1.6s ease-in-out infinite; }
+#sharing .stop { padding-left: 6px; border-left: 1px solid rgba(255, 255, 255, 0.45); font-weight: 400; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { #sharing .dot { animation: none; } }

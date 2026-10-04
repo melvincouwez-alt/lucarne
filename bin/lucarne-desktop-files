@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Écrit les 8 lanceurs .desktop de Lucarne (7 applis + Réglages) dans un dossier.
+
+Usage :
+  lucarne-desktop-files <dossier> <commande lucarne> [<commande lucarne-settings>]
+
+<commande lucarne> est mise telle quelle dans Exec= (« lucarne » pour un paquet qui
+l'installe dans /usr/bin, ou un chemin complet). Sans troisième argument, la commande
+des réglages est « lucarne-settings » placée à côté (même dossier si un chemin est donné).
+Les fichiers : lucarne-<appli>.desktop et lucarne-settings.desktop, en anglais avec [fr].
+Utilisé par install.sh (~/.local/share/applications) et par le paquet .deb
+(/usr/share/applications).
+"""
+
+import os
+import sys
+from pathlib import Path
+
+# id, nom, générique en / fr, catégories, schémas (MimeType), mots-clés en / fr
+APPS = [
+    ("word", "Word", "Word Processor", "Traitement de texte", "Office;WordProcessor;",
+     "x-scheme-handler/ms-word;", "document;docx;text;microsoft;office;", "document;docx;texte;microsoft;office;"),
+    ("excel", "Excel", "Spreadsheet", "Tableur", "Office;Spreadsheet;",
+     "x-scheme-handler/ms-excel;", "spreadsheet;workbook;xlsx;microsoft;office;", "classeur;xlsx;tableur;microsoft;office;"),
+    ("powerpoint", "PowerPoint", "Presentation", "Présentation", "Office;Presentation;",
+     "x-scheme-handler/ms-powerpoint;", "slides;slideshow;pptx;presentation;microsoft;office;",
+     "diaporama;pptx;présentation;microsoft;office;"),
+    ("onenote", "OneNote", "Notebook", "Bloc-notes", "Office;",
+     "x-scheme-handler/onenote;x-scheme-handler/ms-onenote;", "notes;notebook;microsoft;office;",
+     "notes;bloc-notes;microsoft;office;"),
+    ("outlook", "Outlook", "Mail and Calendar", "Courrier et calendrier", "Office;Network;Email;Calendar;",
+     # mailto déclaré (proposé dans « Ouvrir avec ») sans être rendu gestionnaire par défaut
+     "x-scheme-handler/ms-outlook;x-scheme-handler/mailto;", "mail;email;calendar;microsoft;office;",
+     "mail;courrier;calendrier;microsoft;office;"),
+    ("teams", "Teams", "Meetings and Chat", "Réunions et conversations", "Network;InstantMessaging;Chat;VideoConference;",
+     "x-scheme-handler/msteams;", "meeting;video;chat;call;microsoft;", "réunion;visio;chat;appel;microsoft;"),
+    ("powerbi", "Power BI", "Reports and Dashboards", "Rapports et tableaux de bord", "Office;Development;",
+     "x-scheme-handler/ms-powerbi;", "report;dashboard;dax;microsoft;", "rapport;tableau de bord;dashboard;dax;microsoft;"),
+]
+
+# Actions du clic droit (dock) : (id, nom en, nom fr, adresse)
+ACTIONS = {
+    "word": [("new", "New", "Nouveau", "https://word.new")],
+    "excel": [("new", "New", "Nouveau", "https://excel.new")],
+    "powerpoint": [("new", "New", "Nouveau", "https://powerpoint.new")],
+    "onenote": [("new", "New", "Nouveau", "https://onenote.new")],
+    "outlook": [("compose", "New Message", "Nouveau message", "https://outlook.office.com/mail/deeplink/compose"),
+                ("calendar", "Calendar", "Calendrier", "https://outlook.office.com/calendar/")],
+    "teams": [("calendar", "Calendar", "Calendrier", "https://teams.microsoft.com/v2/?tab=calendar")],
+}
+
+
+def exec_quote(cmd):
+    """Commande pour Exec= (spécification Desktop Entry : guillemets si besoin, %% pour %)."""
+    cmd = cmd.replace("%", "%%")
+    if any(c in cmd for c in ' \t\n"\'\\><~|&;$*?#()`'):
+        cmd = '"' + "".join("\\" + c if c in '"`$\\' else c for c in cmd) + '"'
+    # dans un fichier .desktop, la barre oblique inverse est elle-même échappée
+    return cmd.replace("\\", "\\\\")
+
+
+def app_entry(lucarne, app):
+    id_, name, gen_en, gen_fr, cats, mimes, keys_en, keys_fr = app
+    lines = [
+        "[Desktop Entry]",
+        "Type=Application",
+        f"Name={name} (web)",
+        f"Name[fr]={name} en ligne",
+        f"GenericName={gen_en}",
+        f"GenericName[fr]={gen_fr}",
+        f"Comment={gen_en} (Microsoft 365 on the web)",
+        f"Comment[fr]={gen_fr} (Microsoft 365 en ligne)",
+        f"Exec={lucarne} {id_} %U",
+        f"Icon=lucarne-{id_}",
+        # app_id Wayland de l'appli Electron (app.setDesktopName) = nom du lanceur
+        f"StartupWMClass=lucarne-{id_}",
+        f"Categories={cats}",
+        f"Keywords={keys_en}",
+        f"Keywords[fr]={keys_fr}",
+        f"MimeType={mimes}",
+        "Terminal=false",
+        "StartupNotify=true",
+        "X-GNOME-UsesNotifications=true",
+        "X-Lucarne=true",
+    ]
+    actions = ACTIONS.get(id_, [])
+    if actions:
+        lines.append("Actions=" + "".join(f"{a[0]};" for a in actions))
+    for aid, en, fr, url in actions:
+        lines += ["", f"[Desktop Action {aid}]", f"Name={en}", f"Name[fr]={fr}", f"Exec={lucarne} {id_} {exec_quote(url)}"]
+    return "\n".join(lines) + "\n"
+
+
+def settings_entry(settings):
+    return "\n".join([
+        "[Desktop Entry]",
+        "Type=Application",
+        "Name=Lucarne Settings",
+        "Name[fr]=Réglages de Lucarne",
+        "GenericName=Web App Settings",
+        "GenericName[fr]=Réglages des applis web",
+        "Comment=Home pages, notifications, dock and window style of the Lucarne apps",
+        "Comment[fr]=Pages d'accueil, notifications, dock et style des fenêtres Lucarne",
+        f"Exec={settings}",
+        "Icon=lucarne-settings",
+        "StartupWMClass=io.github.melvincouwez.Lucarne.Settings",
+        "Categories=Settings;Office;",
+        "Keywords=microsoft;office;outlook;teams;word;excel;settings;",
+        "Keywords[fr]=microsoft;office;outlook;teams;word;excel;réglages;",
+        "Terminal=false",
+        "X-Lucarne=true",
+    ]) + "\n"
+
+
+def write(path, text):
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(text)
+    os.chmod(tmp, 0o644)
+    tmp.replace(path)
+
+
+def main(argv):
+    if len(argv) not in (2, 3) or argv[0] in ("-h", "--help"):
+        print(__doc__, file=sys.stderr)
+        return 2
+    out, lucarne = Path(argv[0]), argv[1]
+    if len(argv) == 3:
+        settings = argv[2]
+    elif "/" in lucarne:
+        settings = str(Path(lucarne).parent / "lucarne-settings")
+    else:
+        settings = "lucarne-settings"
+    out.mkdir(parents=True, exist_ok=True)
+    for app in APPS:
+        write(out / f"lucarne-{app[0]}.desktop", app_entry(exec_quote(lucarne), app))
+    write(out / "lucarne-settings.desktop", settings_entry(exec_quote(settings)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
