@@ -13,18 +13,19 @@ sous quelle licence, et ce qui en a été repris.
 
 ## Idées et méthodes
 
-- **teams-for-linux** a servi de référence pour une grande partie du travail sur Teams :
+- teams-for-linux a servi de référence pour une grande partie du travail sur Teams :
   lecture des événements d'appel et de présence dans la page, correctifs du micro et de la
   caméra, réglages des réseaux d'entreprise (proxy, certificats, cartes à puce, Intune), fonds
   personnalisés, contournement de `ERR_QUIC_PROTOCOL_ERROR` (ticket #2518). Le code de Lucarne
   est écrit à part en TypeScript, sauf le module WebAuthn ci-dessus. Merci à Ismael Martinez et
   à tous ceux qui y ont contribué.
-- **elementary OS** : style des icônes (éclairage, filets de 1 px, palette), barre de titre et
+- elementary OS : style des icônes (éclairage, filets de 1 px, palette de couleurs, sauf pour
+  Outlook qui a un bleu denim propre au projet, plus éloigné du bleu de Word), barre de titre et
   [Human Interface Guidelines](https://docs.elementary.io/hig). Les couleurs d'accent sont lues
   dans le thème `io.elementary.stylesheet.*`. Aucun fichier d'icône d'elementary n'est copié :
   les icônes de Lucarne sont générées par `icons/deux_plans.py`.
-- **Granite** et **GTK 4** pour l'application de réglages.
-- **Inter** de Rasmus Andersson (SIL Open Font License 1.1) remplace Segoe UI dans les pages
+- Granite et GTK 4 pour l'application de réglages.
+- Inter de Rasmus Andersson (SIL Open Font License 1.1) remplace Segoe UI dans les pages
   quand elle est installée. Lucarne ne la fournit pas.
 
 ## Dépendances

@@ -20,16 +20,9 @@ BUBBLEGUM = ("#fe9ab8", "#f4679d", "#de3e80", "#bc245d", "#910e38")
 ORANGE = ("#ffc27d", "#ffa154", "#f37329", "#cc3b02", "#a62100")
 GRAPE = ("#e4c6fa", "#cd9ef7", "#a56de2", "#7239b3", "#452981")
 BANANA = ("#fff394", "#ffe16b", "#f9c440", "#d48e15", "#ad5f00")
-OUTLOOK = ("#7fd8ff", "#28a8ea", "#0078d4", "#0358a7", "#032d60")
-TEAMS = ("#c5cbfa", "#7b83eb", "#5b5fc7", "#444791", "#2b2c5e")   # violets Microsoft Teams
-# Couleurs des icônes Microsoft 365 actuelles (2026-10-07), en cinq tons comme la palette elementary
-WORD = ("#a9d6fb", "#41a5ee", "#2b7cd3", "#185abd", "#103f91")
-EXCEL = ("#9ee6c2", "#33c481", "#21a366", "#107c41", "#185c37")
-POWERPOINT = ("#ffc4b0", "#ff8f6b", "#ed6c47", "#c43e1c", "#8f2b12")
-ONENOTE = ("#e7b9f5", "#ca64ea", "#ae4bd5", "#9332bf", "#7719aa")
-POWERBI = ("#fff0a0", "#f2c811", "#e8b100", "#c08a00", "#8a5d00")
-# Piste G1 (2026-10-08) : palette elementary au lieu des couleurs de marque, sauf Outlook (choix de Melvin)
-PAL = {"word": BLUEBERRY, "excel": LIME, "powerpoint": ORANGE, "outlook": OUTLOOK,
+# Outlook : bleu denim, hors palette elementary pour rester à distance du bleu de Word (2026-10-08)
+DENIM = ("#b7c9e2", "#7f9cc6", "#56739f", "#3b5680", "#243a5c")
+PAL = {"word": BLUEBERRY, "excel": LIME, "powerpoint": ORANGE, "outlook": DENIM,
        "onenote": BUBBLEGUM, "teams": GRAPE, "powerbi": BANANA}
 INK = "#767e86"     # lignes de texte sur le papier
 RULE = "#b8bfc5"    # filets de grille

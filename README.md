@@ -130,5 +130,7 @@ Microsoft, Microsoft 365, Office, Word, Excel, PowerPoint, OneNote, Outlook, Tea
 SharePoint et OneDrive sont des marques de Microsoft Corporation. Lucarne est un projet
 indépendant, non affilié à Microsoft et non approuvé par Microsoft. Ces noms servent seulement
 à dire quel service s'ouvre dans quelle fenêtre. Les icônes sont des dessins originaux faits
-pour le projet : elles ne reprennent ni les logos ni les lettres de Microsoft. Lucarne ne
+pour le projet : elles ne reprennent ni les logos ni les lettres de Microsoft, et leurs couleurs
+viennent de la palette d'elementary OS (Outlook a un bleu denim à part, pour ne pas se confondre
+avec Word). Lucarne ne
 contient ni code, ni image, ni police de Microsoft.

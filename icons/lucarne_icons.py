@@ -2,7 +2,7 @@
 """Icônes Lucarne : pictogrammes neutres au style elementary OS.
 
 Aucune lettre ni forme reprise des logos Microsoft. Les 7 applis sont dessinées
-par deux_plans.py (tuile de la palette elementary, objet blanc devant) ; ce module
+par deux_plans.py (tuile de la palette elementary, bleu denim pour Outlook, objet blanc devant) ; ce module
 dessine l'engrenage de Réglages, écrit les SVG et la planche de contrôle.
 
 Chaque taille est dessinée dans sa propre grille de pixels (viewBox = taille),

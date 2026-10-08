@@ -33,7 +33,7 @@ LOADER_APPS=(
   "excel|Excel|https://www.office.com/launch/excel?auth=2|#9bdb4d #68b723 #3a9104"
   "powerpoint|PowerPoint|https://www.office.com/launch/powerpoint?auth=2|#ffa154 #f37329 #cc3b02"
   "onenote|OneNote|https://www.office.com/launch/onenote?auth=2|#f4679d #de3e80 #bc245d"
-  "outlook|Outlook|https://outlook.office.com/mail/|#28a8ea #0078d4 #0358a7"
+  "outlook|Outlook|https://outlook.office.com/mail/|#7f9cc6 #56739f #3b5680"
   "teams|Teams|https://teams.microsoft.com/v2/|#cd9ef7 #a56de2 #7239b3"
   "powerbi|Power BI|https://app.powerbi.com/home|#ffe16b #f9c440 #d48e15"
 )

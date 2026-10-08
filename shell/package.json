@@ -1,7 +1,7 @@
 {
   "name": "lucarne",
   "productName": "Lucarne",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Services web Microsoft 365 dans des fenêtres elementary OS (projet indépendant)",
   "main": "dist/main.js",
   "scripts": {
