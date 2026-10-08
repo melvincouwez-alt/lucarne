@@ -28,8 +28,9 @@ EXCEL = ("#9ee6c2", "#33c481", "#21a366", "#107c41", "#185c37")
 POWERPOINT = ("#ffc4b0", "#ff8f6b", "#ed6c47", "#c43e1c", "#8f2b12")
 ONENOTE = ("#e7b9f5", "#ca64ea", "#ae4bd5", "#9332bf", "#7719aa")
 POWERBI = ("#fff0a0", "#f2c811", "#e8b100", "#c08a00", "#8a5d00")
-PAL = {"word": WORD, "excel": EXCEL, "powerpoint": POWERPOINT, "outlook": OUTLOOK,
-       "onenote": ONENOTE, "teams": TEAMS, "powerbi": POWERBI}
+# Piste G1 (2026-10-08) : palette elementary au lieu des couleurs de marque, sauf Outlook (choix de Melvin)
+PAL = {"word": BLUEBERRY, "excel": LIME, "powerpoint": ORANGE, "outlook": OUTLOOK,
+       "onenote": BUBBLEGUM, "teams": GRAPE, "powerbi": BANANA}
 INK = "#767e86"     # lignes de texte sur le papier
 RULE = "#b8bfc5"    # filets de grille
 # Reflet intérieur d'après les icônes système elementary, haut adouci (.45 au lieu de 1)
