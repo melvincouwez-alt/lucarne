@@ -54,6 +54,8 @@ export interface Shell {
   teams: TeamsFeatures | null;
   /** The page title changed: the unread count may have too. */
   badge: () => void;
+  /** A page failed to load: try it again once the network is back. */
+  failed: () => void;
   /** Teams: status, quick chat and accounts, for the window menu. */
   teamsMenu: () => MenuItemConstructorOptions[];
   /** Ctrl+Alt+1…5: that account's window (1 = main account). */
@@ -95,16 +97,21 @@ export function splitTitle(raw: string, app: AppInfo): { title: string; subtitle
  * Wraps window.Notification so a click brings the window forward. Teams also
  * posts the same message a second time about 10 s later, which Chromium shows
  * as a second bubble: the same title and text within a minute reuse the first.
+ * window.__lucarneNotified (title -> time) lets Teams' banner relay (src/teams.ts)
+ * skip a message Teams already notified.
  */
 const FOCUS_HOOK = `(() => {
   if (window.__lucarneHook || !window.Notification) return;
   window.__lucarneHook = true;
   const N = window.Notification;
   const recent = new Map();
+  const notified = window.__lucarneNotified = new Map();
   const repeat = (title, opts) => {
     const key = String(title) + "\\n" + String(opts?.body ?? "");
     const now = Date.now();
     for (const [k, v] of recent) if (now - v.at > 60000) recent.delete(k);
+    for (const [k, at] of notified) if (now - at > 60000) notified.delete(k);
+    notified.set(String(title).slice(0, 200), now);
     return { key, seen: recent.get(key), now };
   };
   const show = window.ServiceWorkerRegistration?.prototype.showNotification;
@@ -266,6 +273,7 @@ export class AppWindow {
       this.revealed = false;
       this.view.setVisible(false);
       this.push();
+      shell.failed();
     });
     page.on("did-navigate", () => this.setSharing(null));
     page.on("page-title-updated", () => shell.badge());
@@ -412,12 +420,16 @@ export class AppWindow {
     if (brand) void page.executeJavaScript(brand).catch(() => undefined);
     // One sheet adopted by the page and rewritten in place: insertCSS keys
     // could outlive a redirect (teams.microsoft.com to teams.cloud.microsoft)
-    // and leave an old sheet nobody could remove.
+    // and leave an old sheet nobody could remove. Rewriting it restyles the
+    // whole page, so the same text is not written again: any change in
+    // config.json, for any of the seven apps, comes through here.
     void page.executeJavaScript(`((css) => {
   let sheet = window.__lucarneSheet;
   if (!sheet) sheet = window.__lucarneSheet = new CSSStyleSheet();
   if (!document.adoptedStyleSheets.includes(sheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  if (window.__lucarneCss === css) return;
   sheet.replaceSync(css);
+  window.__lucarneCss = css;
 })(${JSON.stringify(next)})`).catch(() => undefined);
   }
 
@@ -564,6 +576,23 @@ export class AppWindow {
             minimizable: false,
             fullscreenable: false,
             title: t("Réunion"),
+            icon: path.join(__dirname, "..", "assets", "icons", `${app.id}.png`),
+          },
+        };
+      }
+      if (frameName === "lucarne-share" && url === "about:blank" && this.shell.teams) {
+        // A colleague's shared screen in a window of its own (assets/teams-mini.js).
+        return {
+          action: "allow",
+          overrideBrowserWindowOptions: {
+            width: 1280,
+            height: 760,
+            minWidth: 480,
+            minHeight: 300,
+            titleBarStyle: "hidden",
+            backgroundColor: "#1e1e1e",
+            autoHideMenuBar: true,
+            title: t("Partage d'écran"),
             icon: path.join(__dirname, "..", "assets", "icons", `${app.id}.png`),
           },
         };

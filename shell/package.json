@@ -1,12 +1,13 @@
 {
   "name": "lucarne",
   "productName": "Lucarne",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Services web Microsoft 365 dans des fenêtres elementary OS (projet indépendant)",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
     "start": "tsc && electron . --no-sandbox",
+    "check": "tsc && dbus-run-session -- node scripts/check.js",
     "dist": "tsc && python3 scripts/render-icons.py && sh scripts/stage-desktop.sh && electron-builder --linux deb --publish never"
   },
   "author": "Lucarne contributors <301110918+melvincouwez-alt@users.noreply.github.com>",

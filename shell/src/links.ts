@@ -5,7 +5,7 @@
 
 import { spawn } from "child_process";
 import { shell } from "electron";
-import { command, type AppId } from "./identity";
+import { command, isAppId, type AppId } from "./identity";
 
 const EXT: Record<string, string[]> = {
   word: ["doc", "docx", "docm", "dot", "dotx", "dotm", "odt", "rtf"],
@@ -101,6 +101,9 @@ export function appFor(url: string): AppId | null {
       const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
       for (const [a, list] of Object.entries(EXT)) if (list.includes(ext)) return a as AppId;
       if ((q.get("wd") || "").startsWith("target(")) return "onenote";
+      // Doc.aspx without a file name: the app given by "app=", if any.
+      const named = (q.get("app") || "").toLowerCase();
+      return isAppId(named) ? named : null;
     }
   }
   return null;

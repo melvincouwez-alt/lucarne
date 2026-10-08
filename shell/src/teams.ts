@@ -18,7 +18,7 @@ import os from "os";
 import path from "path";
 import { nativeTheme, net, powerSaveBlocker, type BrowserWindow, type WebContents } from "electron";
 import type { AppConfig } from "./config";
-import { closeNotice, idleSeconds, notify, screenLocked, toggleAbove } from "./desktop";
+import { closeNotice, idleSeconds, notify, screenLocked, toggleAbove, watchIdle } from "./desktop";
 import { openPanel, type Panel } from "./panel";
 import { strings, t } from "./i18n";
 
@@ -50,7 +50,16 @@ const HUB = `(() => {
   };
 
   // Calls: the page's command stream (same filters as teams-for-linux).
+  // The call state also starts and stops the meeting mini window's watch
+  // (teams-mini.js), which otherwise looked for a meeting every 0.7 s.
   let tries = 0;
+  let subscribed = false;
+  let callOn = false;
+  const live = new Set();
+  const call = (on) => {
+    if (on !== undefined) callOn = on;
+    window.__lucarneTeams?.mini?.wake();
+  };
   const subscribe = () => {
     const reporting = core()?.commandChangeReportingService;
     if (!reporting) return false;
@@ -65,10 +74,16 @@ const HUB = `(() => {
             emit("incoming", data);
             picture(opts.mainImage?.src).then((image) => image && emit("incoming", { ...data, image }));
           } else emit("incoming-end", {});
-        } else if (e.context.step === "calling-screen-rendered") emit("call", { on: true });
-        else if (e.context.step === "render_disconected") emit("call", { on: false });
+        } else if (e.context.step === "calling-screen-rendered") {
+          emit("call", { on: true });
+          call(true);
+        } else if (e.context.step === "render_disconected") {
+          emit("call", { on: false });
+          call(false);
+        }
       } catch {}
     });
+    subscribed = true;
     emit("ready", {});
     return true;
   };
@@ -78,8 +93,14 @@ const HUB = `(() => {
   // report): count the peer connections that are up.
   const PC = window.RTCPeerConnection;
   if (PC) {
-    const live = new Set();
-    const sync = (pc, up) => { const had = live.size; up ? live.add(pc) : live.delete(pc); if (!had !== !live.size) emit("rtc", { live: live.size }); };
+    const sync = (pc, up) => {
+      const had = live.size;
+      up ? live.add(pc) : live.delete(pc);
+      if (!had !== !live.size) {
+        emit("rtc", { live: live.size });
+        call();
+      }
+    };
     const Wrapped = function (...args) {
       const pc = new PC(...args);
       pc.addEventListener("connectionstatechange", () => sync(pc, pc.connectionState === "connected"));
@@ -112,7 +133,6 @@ const HUB = `(() => {
   // notifications and hidden; a click on ours clicks theirs (opens the chat).
   const BANNER = '[data-testid="notification-wrapper"]';
   const shown = new Map();
-  let bannersOn = false;
   let bannerId = 0;
   let pending = 0;
   const part = (box, name) => (box.querySelector('[id^="cn-normal-notification-' + name + '"]')?.innerText || "").trim();
@@ -136,15 +156,66 @@ const HUB = `(() => {
       if (shown.size > 50) shown.delete(shown.keys().next().value);
       const data = { id, title: title.slice(0, 200), body: (subtitle && subtitle !== title ? subtitle + " : " : "") + body.slice(0, 500) };
       const src = box.querySelector('[data-testid="normal-toast-image"] img')?.src;
-      picture(src).then((image) => emit("banner", { ...data, image }));
+      picture(src).then((image) => {
+        // Window not focused: Teams also sends its own notification for this
+        // message (same title), up to a few seconds before or after its
+        // banner. One is enough: the banner waits for it, then gives way.
+        const send = () => {
+          const at = window.__lucarneNotified?.get(data.title);
+          if (!(at && Date.now() - at < 8000)) emit("banner", { ...data, image });
+        };
+        if (document.hasFocus()) send();
+        else setTimeout(send, 3000);
+      });
     }
   };
-  new MutationObserver(() => { if (bannersOn && !pending) pending = setTimeout(scan, 300); })
-    .observe(document.documentElement, { childList: true, subtree: true });
+  // Watches the page only while the relay is on.
+  const watch = new MutationObserver(() => { if (!pending) pending = setTimeout(scan, 300); });
+
+  // Teams' own notifications (window not focused) take the same road as the
+  // banners: Teams logo, sender's photo, Show / Reply buttons. Teams gets a
+  // stand-in object; a click on ours is a click on it (opens the chat).
+  let relay = false;
+  const toasts = new Map();
+  const Prev = window.Notification;
+  if (Prev) {
+    class Toast extends EventTarget {
+      constructor(title, opts = {}) {
+        if (!relay) return new Prev(title, opts);
+        super();
+        Object.assign(this, { title: String(title), body: String(opts.body ?? ""), tag: opts.tag ?? "", data: opts.data ?? null, icon: opts.icon ?? "" });
+        const id = ++bannerId;
+        toasts.set(id, this);
+        if (toasts.size > 50) toasts.delete(toasts.keys().next().value);
+        const key = this.title.slice(0, 200);
+        window.__lucarneNotified?.set(key, Date.now());
+        picture(opts.icon || opts.image).then((image) => emit("banner", { id, title: key, body: this.body.slice(0, 500), image }));
+        setTimeout(() => this.dispatchEvent(new Event("show")));
+      }
+      dispatchEvent(e) {
+        const r = super.dispatchEvent(e);
+        try { this["on" + e.type]?.call(this, e); } catch {}
+        return r;
+      }
+      close() { this.dispatchEvent(new Event("close")); }
+      static get permission() { return Prev.permission; }
+      static requestPermission(...a) { return Prev.requestPermission(...a); }
+    }
+    window.Notification = Toast;
+  }
 
   window.__lucarneTeams = {
-    banners: (on) => { bannersOn = Boolean(on); },
+    banners: (on) => {
+      relay = on;
+      if (on) watch.observe(document.documentElement, { childList: true, subtree: true });
+      else watch.disconnect();
+    },
     openBanner: (id) => {
+      const toast = toasts.get(id);
+      if (toast) {
+        toast.dispatchEvent(new Event("click"));
+        return true;
+      }
       const box = shown.get(id)?.deref();
       if (!box?.isConnected) return false;
       box.click();
@@ -153,6 +224,9 @@ const HUB = `(() => {
     active: () => { try { tracker()?.handleMonitoredWindowEvent(); } catch {} },
     idle: () => { try { tracker()?.transitionToIdle(); } catch {} },
     status,
+    /** False while the command stream is not reached: the mini window then keeps watching. */
+    ready: () => subscribed,
+    inCall: () => callOn || live.size > 0,
     theme: (dark) => {
       const theme = core()?.clientPreferences?.clientPreferences?.theme;
       // Only light <-> dark: a high-contrast choice made in Teams stays.
@@ -197,6 +271,7 @@ export type TeamsEvent =
   | { type: "rtc"; live: number }
   | { type: "banner"; id: number; title: string; body: string; image?: string }
   | { type: "mini-pin"; on: boolean }
+  | { type: "share-pin" }
   | { type: "mini-show" };
 
 export type Availability = "Available" | "Busy" | "DoNotDisturb" | "BeRightBack" | "Away" | "Offline";
@@ -253,7 +328,13 @@ export class TeamsFeatures {
   private inCall = false;
   private rtc = false;
   private away = false;
-  private timer: NodeJS.Timeout;
+  /** 5 minutes without input, or the screen locked. */
+  private gone = false;
+  /** While there is input: Teams is told every minute (nudge()). */
+  private typing: NodeJS.Timeout | null = null;
+  /** Fallback when Gala offers no idle watches: asking every 10 s. */
+  private poll: NodeJS.Timeout | null = null;
+  private closed = false;
   private command: ChildProcess | null = null;
   private chat: Panel | null = null;
   private mini: BrowserWindow | null = null;
@@ -266,7 +347,21 @@ export class TeamsFeatures {
     private show: (page: WebContents | null) => void,
     private openUrl: (url: string) => void,
   ) {
-    this.timer = setInterval(() => void this.presence(), 10_000);
+    void watchIdle([15_000, AWAY_AFTER * 1000], {
+      idle: (ms) => (ms >= AWAY_AFTER * 1000 ? this.setGone(true) : this.setTyping(false)),
+      active: () => {
+        this.setGone(false);
+        this.setTyping(true);
+      },
+      locked: (on) => {
+        this.setGone(on);
+        this.setTyping(!on);
+      },
+    }).then((ok) => {
+      if (this.closed) return;
+      if (ok) this.setTyping(true);
+      else this.poll = setInterval(() => void this.presence(), 10_000);
+    });
     trimAvatars();
   }
 
@@ -291,6 +386,10 @@ export class TeamsFeatures {
       case "mini-pin":
         void this.pinMini(event.on, page);
         break;
+      case "share-pin":
+        // the share window has the focus (its pin was just clicked): Gala's "always on top" acts on it
+        void toggleAbove();
+        break;
       case "mini-show":
         this.show(page);
         break;
@@ -314,7 +413,7 @@ export class TeamsFeatures {
 
   /** A banner from inside the window, as a system notification (with the sender's photo). */
   private async banner(b: { id: number; title: string; body: string; image?: string }, page: WebContents): Promise<void> {
-    let icon = "lucarne-teams";
+    let image = "";
     const m = /^data:image\/(png|jpeg|gif|webp);base64,(.+)$/.exec(b.image ?? "");
     if (m) {
       try {
@@ -323,9 +422,9 @@ export class TeamsFeatures {
           fs.mkdirSync(AVATARS, { recursive: true });
           fs.writeFileSync(file, Buffer.from(m[2], "base64"));
         }
-        icon = file;
+        image = file;
       } catch {
-        // the app icon then
+        // the logo alone then
       }
     }
     const open = (): void => {
@@ -335,7 +434,8 @@ export class TeamsFeatures {
     await notify({
       summary: b.title,
       body: b.body,
-      icon,
+      icon: "lucarne-teams",
+      image,
       desktopEntry: "lucarne-teams",
       actions: [["default", t("Afficher")], ["reply", t("Répondre|message")]],
       onAction: open,
@@ -445,22 +545,48 @@ export class TeamsFeatures {
       powerSaveBlocker.stop(this.blocker);
       this.blocker = -1;
     }
+    // A call that ends while the session is idle: Away now.
+    this.applyAway();
   }
 
+  /** Recent input anywhere in the session counts as activity in Teams. */
+  private nudge(): void {
+    if (this.conf().presence) this.run("window.__lucarneTeams?.active()");
+  }
+
+  /**
+   * ponytail: Teams is told once a minute, against every 10 s before; its
+   * own idle timer turns Away after 5 minutes, shorten this if it ever flips
+   * to Away while working in another app.
+   */
+  private setTyping(on: boolean): void {
+    if (this.typing) clearInterval(this.typing);
+    this.typing = null;
+    if (!on || this.closed) return;
+    this.nudge();
+    this.typing = setInterval(() => this.nudge(), 60_000);
+  }
+
+  private setGone(on: boolean): void {
+    this.gone = on;
+    if (!on) this.away = false;
+    this.applyAway();
+  }
+
+  private applyAway(): void {
+    if (this.closed || !this.gone || !this.conf().awayIdle || this.away || this.inCall || this.rtc) return;
+    this.away = true;
+    this.run("window.__lucarneTeams?.idle()");
+  }
+
+  /** Fallback without Gala's watches. */
   private async presence(): Promise<void> {
     const conf = this.conf();
     if (!conf.presence && !conf.awayIdle) return;
     const [idle, locked] = await Promise.all([idleSeconds(), screenLocked()]);
     if (idle === null) return;
-    const gone = locked || idle >= AWAY_AFTER;
-    if (!gone) {
-      this.away = false;
-      // Recent input anywhere in the session counts as activity in Teams.
-      if (conf.presence && idle < 15) this.run("window.__lucarneTeams?.active()");
-    } else if (conf.awayIdle && !this.away && !this.inCall && !this.rtc) {
-      this.away = true;
-      this.run("window.__lucarneTeams?.idle()");
-    }
+    this.setGone(locked || idle >= AWAY_AFTER);
+    if (!this.gone && idle < 15) this.nudge();
   }
 
   private token(resource: string, page?: WebContents | null): Promise<string | null> {
@@ -493,12 +619,13 @@ export class TeamsFeatures {
     else await this.call(page, PRESENCE, url, { method: "DELETE" });
   }
 
-  /** Meeting mini window opened or closed by hand (menu, Ctrl+Alt+P). */
+  /** Shared screen window, else meeting mini window, opened or closed by hand (menu, Ctrl+Alt+P). */
   async popOut(page?: WebContents | null): Promise<boolean> {
     for (const p of page ? [page] : this.pages()) {
       if (p.isDestroyed()) continue;
       for (const frame of p.mainFrame.framesInSubtree) {
-        const done = await frame.executeJavaScript("window.__lucarneTeams?.mini?.toggle() ?? false", true).catch(() => false);
+        // a colleague's shared screen first, in its own window; else the meeting mini window
+        const done = await frame.executeJavaScript("(window.__lucarneTeams?.mini?.share() || window.__lucarneTeams?.mini?.toggle()) ?? false", true).catch(() => false);
         if (done) return true;
       }
     }
@@ -552,7 +679,9 @@ export class TeamsFeatures {
   }
 
   close(): void {
-    clearInterval(this.timer);
+    this.closed = true;
+    this.setTyping(false);
+    if (this.poll) clearInterval(this.poll);
     this.stopRinging();
     this.chat?.close();
     this.inCall = this.rtc = false;

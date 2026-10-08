@@ -1,125 +1,134 @@
 # Lucarne
 
-Lucarne opens the Microsoft 365 web apps (Word, Excel, PowerPoint, OneNote, Outlook, Teams,
-Power BI) in their own desktop windows on elementary OS. Each service gets a window, a dock
-icon, system notifications and an unread counter, like an installed app. What you see inside
-is the page Microsoft serves to a browser: Lucarne does not imitate or replace Office, it frames
-it.
+Lucarne ouvre les applications web de Microsoft 365 (Word, Excel, PowerPoint, OneNote,
+Outlook, Teams, Power BI) dans leurs propres fenêtres sur elementary OS. Chaque service a sa
+fenêtre, son icône dans le dock, ses notifications système et son compteur de non-lus, comme
+une application installée. Le contenu de la fenêtre est la page que Microsoft sert à un
+navigateur : Lucarne n'imite pas Office et ne le remplace pas, il l'encadre.
 
-A *lucarne* is a small window set into a roof. The project is the sibling of
-[Vasistas](https://github.com/melvincouwez-alt/vasistas), which does the same for Windows
-applications running in a virtual machine.
+Une lucarne est une petite fenêtre percée dans un toit. Le projet est le pendant de
+[Vasistas](https://github.com/melvincouwez-alt/vasistas), qui fait la même chose pour les
+applications Windows d'une machine virtuelle.
 
-Lucarne is an independent project, not affiliated with Microsoft. See [Trademarks](#trademarks).
+Lucarne est un projet indépendant, non affilié à Microsoft. Voir [Marques](#marques).
 
-![Lucarne icons](docs/icons.png)
+![Icônes de Lucarne](docs/icons.png)
 
-## What it does
+## Ce que fait Lucarne
 
-- One window per service, with an elementary header bar (in the service's colour, or neutral)
-  and a fixed Wayland `app_id` (`lucarne-<app>`), so the dock groups windows properly.
-- One Microsoft sign-in for all seven windows: the `login.microsoftonline.com` cookies are
-  shared between the app profiles through a file only you can read.
-- System notifications with an "Open" button, unread badges in the dock.
-- Links clicked in Chrome (SharePoint and OneDrive documents, Outlook, Teams, Power BI) are
-  sent to the right window by a small extension.
-- Teams: screen sharing through the Wayland portal, noise-cancelling microphone (RNNoise),
-  the infrared camera hidden from the camera list, incoming calls as notifications with
-  buttons, status from the panel, several accounts, company network settings.
-- A "Lucarne Settings" app (GTK 4 + Granite): home page, single window, notifications,
-  autostart and style, per service.
-- English and French. The language follows the system, or can be set in Settings.
+- Une fenêtre par service, avec une barre de titre elementary (à la couleur du service, ou
+  neutre) et un `app_id` Wayland fixe (`lucarne-<appli>`) pour que le dock regroupe bien les
+  fenêtres.
+- Une seule connexion Microsoft pour les sept fenêtres : les cookies de
+  `login.microsoftonline.com` sont partagés entre les profils par un fichier lisible par vous
+  seul.
+- Notifications système avec un bouton « Ouvrir », pastilles de non-lus dans le dock.
+- Les liens cliqués dans Chrome (documents SharePoint et OneDrive, Outlook, Teams, Power BI)
+  sont envoyés à la bonne fenêtre par une petite extension.
+- Teams : partage d'écran par le portail Wayland, micro antibruit (RNNoise), caméra infrarouge
+  masquée dans la liste des caméras, appels entrants en notification avec boutons, statut
+  depuis le panneau, plusieurs comptes, réglages pour les réseaux d'entreprise, bouton
+  « Détacher » pour suivre un partage d'écran dans sa propre fenêtre.
+- Une application « Réglages de Lucarne » (GTK 4 + Granite) : page d'accueil, fenêtre unique,
+  notifications, démarrage automatique et style, service par service.
+- Interface en français et en anglais. La langue suit celle du système, ou se choisit dans
+  les réglages.
 
-## Install
+## Installation
 
-Download the `.deb` from the [releases](https://github.com/melvincouwez-alt/lucarne/releases)
-and install it:
+Téléchargez le `.deb` depuis les
+[versions publiées](https://github.com/melvincouwez-alt/lucarne/releases) puis installez-le :
 
 ```sh
 sudo apt install ./lucarne-<version>-linux-amd64.deb
 ```
 
-The package contains the windows (`lucarne-app`), the `lucarne` and `lucarne-settings`
-commands, the launchers, the icons and the Chrome native messaging host. It replaces the
-earlier `microsoft365-elementary` package; on first start the `~/.config/m365-linux`,
-`~/.local/share/m365-linux` and `~/.cache/m365-linux` folders are renamed to `lucarne`, signed-in
-profiles included.
+Le paquet contient les fenêtres (`lucarne-app`), les commandes `lucarne` et
+`lucarne-settings`, les lanceurs, les icônes et l'hôte de messagerie native pour Chrome. Il
+remplace l'ancien paquet `microsoft365-elementary` ; au premier démarrage, les dossiers
+`~/.config/m365-linux`, `~/.local/share/m365-linux` et `~/.cache/m365-linux` sont renommés en
+`lucarne`, profils connectés compris.
 
-To send links from Chrome to Lucarne, load the extension once: open `chrome://extensions`,
-turn on developer mode, choose "Load unpacked" and pick
-`/opt/Lucarne/resources/desktop/extension`.
+Pour que Chrome envoie les liens à Lucarne, chargez l'extension une fois : ouvrez
+`chrome://extensions`, activez le mode développeur, choisissez « Charger l'extension non
+empaquetée » et indiquez `/opt/Lucarne/resources/desktop/extension`.
 
-Tested on elementary OS 9 (Wayland). Other Debian-based desktops should work; the
-settings app needs Granite 7.
+Testé sur elementary OS 9 (Wayland). Les autres bureaux basés sur Debian devraient
+fonctionner ; l'application de réglages demande Granite 7.
 
-## Build from source
+## Compiler depuis les sources
 
 ```sh
 cd shell
 npm ci
+npm run check       # vérification des types et tests sans lancer l'appli
 npm run dist        # shell/release/lucarne-<version>-linux-amd64.deb
 ```
 
-For development without the package, `./install.sh` links the commands into `~/.local/bin`
-and writes the launchers to `~/.local/share/applications`. Without `lucarne-app`, the
-`lucarne` command falls back to a Chrome `--app` window that goes through a fixed local page,
-which also gives each service a stable `app_id`.
+Pour développer sans le paquet, `./install.sh` crée les liens des commandes dans
+`~/.local/bin` et écrit les lanceurs dans `~/.local/share/applications`. Sans `lucarne-app`,
+la commande `lucarne` se replie sur une fenêtre Chrome `--app` qui passe par une page locale
+fixe, ce qui donne aussi à chaque service un `app_id` stable.
 
-## Command line
+## Ligne de commande
 
 ```
-lucarne <app> [URL]                     open a service (word, excel, powerpoint, onenote, outlook, teams, powerbi)
-lucarne open <URL|ms-word:…|file>       pick the service from the address
-lucarne link <app> URL [file]           a clicked link: on the web, or in Office in Vasistas, per the settings
-lucarne config get                      settings as JSON
-lucarne config set <app> <key> <value>
+lucarne <appli> [URL]                   ouvre un service (word, excel, powerpoint, onenote, outlook, teams, powerbi)
+lucarne open <URL|ms-word:…|fichier>    choisit le service d'après l'adresse
+lucarne link <appli> URL [fichier]      lien cliqué : en ligne, ou dans l'Office de Vasistas, selon les réglages
+lucarne config get                      réglages en JSON
+lucarne config set <appli> <clé> <valeur>
 lucarne config set language auto|en|fr
-lucarne status                          state as JSON (services, extension, Vasistas)
+lucarne status                          état en JSON (services, extension, Vasistas)
 ```
 
-## Working with Vasistas
+## Avec Vasistas
 
-The two projects share no code and each works on its own. When both are installed, they talk
-through their commands only, looked up in `PATH` when needed. Nothing runs in the background
-for it.
+Les deux projets ne partagent aucun code et chacun fonctionne seul. Quand les deux sont
+installés, ils communiquent uniquement par leurs commandes, cherchées dans le `PATH` au moment
+voulu. Rien ne tourne en arrière-plan pour cela.
 
-- Lucarne to Vasistas: when a service is set to "Windows VM", a clicked document goes to
-  `vasistas launch "ms-word:ofe|u|<file address>"` (Office opens the file itself), and a local
-  file to `vasistas open`. `LUCARNE_VASISTAS` overrides the command. Without Vasistas, the
-  choice is hidden in Settings and in the extension.
-- Vasistas to Lucarne: the "Browser" page of the Vasistas companion app reads
-  `lucarne status` and `lucarne config get`, and saves the choice with
-  `lucarne config set <app> target vm|web`.
+- De Lucarne vers Vasistas : quand un service est réglé sur « VM Windows », un document cliqué
+  part vers `vasistas launch "ms-word:ofe|u|<adresse du fichier>"` (Office ouvre lui-même le
+  fichier), et un fichier local vers `vasistas open`. `LUCARNE_VASISTAS` remplace la commande.
+  Sans Vasistas, ce choix est masqué dans les réglages et dans l'extension.
+- De Vasistas vers Lucarne : la page « Navigateur » du compagnon Vasistas lit
+  `lucarne status` et `lucarne config get`, et enregistre le choix avec
+  `lucarne config set <appli> target vm|web`.
 
-## Layout
+## Organisation du dépôt
 
-| Path | What it is |
+| Chemin | Contenu |
 |---|---|
-| `shell/` | Electron app (TypeScript). One process per service: `lucarne-app --lucarne-app=<id> [URL]`. |
-| `bin/lucarne` | Main command: opens a service, picks the service for an address, interface for other programs. |
-| `bin/lucarne-settings` | Settings app. |
-| `bin/lucarne-native-host` | Native messaging host for the Chrome extension. |
-| `bin/lucarne_config.py`, `bin/lucarne_i18n.py` | `~/.config/lucarne/config.json`, translations. |
-| `bin/lucarne-desktop-files` | Writes the `.desktop` launchers (used by `install.sh` and the package). |
-| `extension/` | Chrome extension (Manifest V3). |
-| `icons/lucarne_icons.py` | Draws the icons: generic pictograms in the elementary palette. |
+| `shell/` | Application Electron (TypeScript). Un processus par service : `lucarne-app --lucarne-app=<id> [URL]`. |
+| `bin/lucarne` | Commande principale : ouvre un service, choisit le service d'une adresse, sert d'interface aux autres programmes. |
+| `bin/lucarne-settings` | Application de réglages. |
+| `bin/lucarne-native-host` | Hôte de messagerie native pour l'extension Chrome. |
+| `bin/lucarne_config.py`, `bin/lucarne_i18n.py` | `~/.config/lucarne/config.json`, traductions. |
+| `bin/lucarne-desktop-files` | Écrit les lanceurs `.desktop` (utilisé par `install.sh` et le paquet). |
+| `extension/` | Extension Chrome (Manifest V3). |
+| `icons/deux_plans.py` | Dessine les icônes des services : une tuile de couleur derrière, un objet blanc devant. |
+| `icons/lucarne_icons.py` | Point d'entrée des icônes, et icône des réglages. |
 
-## Development notes
+## Notes de développement
 
-- Test without touching your real profile: `HOME=<throwaway folder> LUCARNE_DEV_PROBE=/path.png
-  shell/release/linux-unpacked/lucarne-app --no-sandbox --lucarne-app=outlook`. Never start it
-  with an empty `HOME`: Electron then falls back to your real profile.
-- Type check: `cd shell && npx tsc --noEmit -p .`.
+- Tester sans toucher à votre vrai profil : `HOME=<dossier jetable> LUCARNE_DEV_PROBE=/chemin.png
+  shell/release/linux-unpacked/lucarne-app --no-sandbox --lucarne-app=outlook`. Ne le lancez
+  jamais avec un `HOME` vide : Electron retombe alors sur votre vrai profil.
+- Tout code injecté dans Teams doit construire ses éléments nœud par nœud : la page impose les
+  Trusted Types, `innerHTML` et `document.write` y lèvent une erreur.
 
-## License
+## Licence
 
-GPL-3.0-or-later, see [LICENSE](LICENSE). Lucarne includes GPL-3.0 code (teams-for-linux, the
-RNNoise plugin). Sources and credits are listed in [CREDITS.md](CREDITS.md).
+GPL-3.0 ou ultérieure, voir [LICENSE](LICENSE). Lucarne contient du code sous GPL-3.0
+(teams-for-linux, le greffon RNNoise). Les sources et crédits sont listés dans
+[CREDITS.md](CREDITS.md).
 
-## Trademarks
+## Marques
 
-Microsoft, Microsoft 365, Word, Excel, PowerPoint, OneNote, Outlook, Teams, Power BI,
-SharePoint and OneDrive are trademarks of Microsoft Corporation. Lucarne is not affiliated
-with or endorsed by Microsoft. These names are only used to say which service opens in which
-window. The icons are generic pictograms drawn for the project. Lucarne contains no Microsoft
-code, images or fonts.
+Microsoft, Microsoft 365, Office, Word, Excel, PowerPoint, OneNote, Outlook, Teams, Power BI,
+SharePoint et OneDrive sont des marques de Microsoft Corporation. Lucarne est un projet
+indépendant, non affilié à Microsoft et non approuvé par Microsoft. Ces noms servent seulement
+à dire quel service s'ouvre dans quelle fenêtre. Les icônes sont des dessins originaux faits
+pour le projet : elles ne reprennent ni les logos ni les lettres de Microsoft. Lucarne ne
+contient ni code, ni image, ni police de Microsoft.

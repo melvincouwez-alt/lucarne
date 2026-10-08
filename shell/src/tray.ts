@@ -32,7 +32,11 @@ export function showTray(info: AppInfo, handlers: NonNullable<typeof actions>): 
   app = info;
   actions = handlers;
   if (tray) return rebuild();
-  const icon = nativeImage.createFromPath(path.join(__dirname, "..", "assets", "icons", `${info.id}.png`)).resize({ width: 64, height: 64 });
+  // The panel draws tray icons as a one-color shape: an app whose colored icon
+  // turns into a blob there ships a hand-drawn `<id>-tray.png` silhouette.
+  const dir = path.join(__dirname, "..", "assets", "icons");
+  const mono = nativeImage.createFromPath(path.join(dir, `${info.id}-tray.png`));
+  const icon = mono.isEmpty() ? nativeImage.createFromPath(path.join(dir, `${info.id}.png`)).resize({ width: 64, height: 64 }) : mono;
   tray = new Tray(icon);
   tray.on("click", () => actions?.show());
   rebuild();

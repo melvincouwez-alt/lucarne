@@ -49,8 +49,15 @@ const EN: Record<string, string> = {
   "Ajouter un compte Teams": "Add a Teams Account",
   "Nom du compte (par exemple « Client X » ou une adresse) :": "Account name (for example \"Client X\" or an email address):",
   "Statut Teams non changé": "Teams status not changed",
+  "Réglage non enregistré": "Setting not saved",
+  "config.json est illisible : rien n'a été enregistré (copie gardée dans config.json.bak)":
+    "config.json cannot be read: nothing was saved (copy kept in config.json.bak)",
   "Partage d'écran": "Screen sharing",
   "Aucune vidéo à détacher dans Teams.": "No video to pop out in Teams.",
+  "Détacher": "Pop out",
+  "Ouvrir le partage d'écran dans une fenêtre": "Open the shared screen in a window",
+  "Le partage d'écran est terminé": "Screen sharing has ended",
+  "Fermer": "Close",
   "Téléchargement terminé": "Download complete",
   "Écran": "Screen",
   "Lucarne, projet indépendant sous licence GPL-3.0. {name} et Microsoft 365 sont des marques de Microsoft Corporation ; Lucarne affiche leur service web et n'est ni affilié à Microsoft ni approuvé par Microsoft.":
@@ -168,6 +175,3 @@ export function t(fr: string, vars?: Record<string, string | number>): string {
 export function strings(): { lang: Language; strings: Record<string, string> } {
   return { lang: current, strings: current === "en" ? EN : {} };
 }
-
-/** Every French key (for the consistency check of the dictionary). */
-export const KEYS = (): string[] => Object.keys(EN);

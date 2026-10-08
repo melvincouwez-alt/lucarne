@@ -32,6 +32,9 @@ def _(text, **kw):
 
 
 EN = {
+    "Réglage non enregistré": "Setting not saved",
+    "config.json est illisible : rien n'a été enregistré (copie gardée dans config.json.bak)":
+        "config.json cannot be read: nothing was saved (copy kept in config.json.bak)",
     # ------------------------------------------------ bin/lucarne
     "Fichier local non pris en charge": "Local file not supported",
     "{file} : les fichiers locaux s'ouvrent dans l'Office de la VM Vasistas, qui n'est pas installée. "

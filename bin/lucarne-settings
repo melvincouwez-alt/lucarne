@@ -169,7 +169,15 @@ class Window(Gtk.ApplicationWindow):
         if self.cfg(app).get(key) == value:
             return
         self.cfg(app)[key] = value
-        mc.set_value(app, key, value)
+        self.write(mc.set_value, app, key, value)
+
+    def write(self, change, *args):
+        """config.json illisible : il n'est pas remplacé, l'utilisateur est prévenu."""
+        try:
+            change(*args)
+        except mc.ConfigUnreadable:
+            Gtk.AlertDialog(message=_("Réglage non enregistré"), detail=_(
+                "config.json est illisible : rien n'a été enregistré (copie gardée dans config.json.bak)")).show(self)
 
     def on_file_changed(self, *_):
         if self.reload_timer:
@@ -388,7 +396,7 @@ class Window(Gtk.ApplicationWindow):
             if value == self.config.get("language", "auto"):
                 return
             self.config["language"] = value
-            mc.set_language(value)
+            self.write(mc.set_language, value)
             lucarne_i18n.refresh(self.config)
             # reconstruire hors du signal : la liste déroulante elle-même est remplacée
             GLib.idle_add(lambda: self.build("general") or False)

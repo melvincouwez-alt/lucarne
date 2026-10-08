@@ -1,3 +1,6 @@
 extension.pem
 __pycache__/
 *.pyc
+
+# Planches d'essais d'icônes : locales, jamais publiées
+icons/pistes/

@@ -7,8 +7,8 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
-const locale = ipcRenderer.sendSync("lucarne-page:locale") as string;
-const early = (ipcRenderer.sendSync("lucarne-page:early") ?? {}) as { windowsMode?: boolean; lockDevices?: boolean; webauthn?: boolean; sharePreview?: boolean };
+// One synchronous call per page load: it holds the page until the main process answers.
+const early = (ipcRenderer.sendSync("lucarne-page:early") ?? {}) as { locale?: string; windowsMode?: boolean; lockDevices?: boolean; webauthn?: boolean; sharePreview?: boolean };
 
 // Security keys at sign-in (src/webauthn.ts): the page's navigator.credentials
 // is replaced by a script that asks the main process, which runs fido2-tools.
@@ -18,6 +18,17 @@ if (early.webauthn && LOGIN.test(location.origin)) {
   contextBridge.exposeInMainWorld("__lucarneWebAuthn", (channel: string, data: unknown) =>
     channel === "webauthn:create" || channel === "webauthn:get" ? ipcRenderer.invoke(channel, data) : Promise.reject(new Error("refused")));
 }
+
+// One badge per app on the dock, Lucarne's (src/badge.ts, its "badge" setting).
+// Electron passes the page's own navigator.setAppBadge() to the dock as well:
+// Outlook sends 0 there whatever its Inbox holds, and the two kept overwriting
+// each other. ponytail: a service worker can still call it (no preload there).
+contextBridge.executeInMainWorld({
+  func: () => {
+    for (const name of ["setAppBadge", "clearAppBadge"])
+      if (name in Navigator.prototype) Object.defineProperty(Navigator.prototype, name, { value: () => Promise.resolve(), configurable: true, writable: true });
+  },
+});
 
 // Before the page's own scripts: what they read once at start.
 contextBridge.executeInMainWorld({
@@ -67,7 +78,8 @@ contextBridge.executeInMainWorld({
   func: (preview: boolean) => {
     const media = navigator.mediaDevices;
     if (!media?.getDisplayMedia) return;
-    // What is being shared, twice a second, for the preview window. A clone of
+    // What is being shared, once a second, for the preview window (it was
+    // twice: JPEG encoding while a call already loads the CPU). A clone of
     // the track: no second capture, so no second portal prompt.
     const watch = (track: MediaStreamTrack) => {
       const copy = track.clone();
@@ -83,7 +95,7 @@ contextBridge.executeInMainWorld({
         canvas.height = Math.round(video.videoHeight * scale);
         canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
         window.postMessage({ lucarnePreview: canvas.toDataURL("image/jpeg", 0.6) }, "*");
-      }, 500);
+      }, 1000);
       const stop = () => { clearInterval(timer); copy.stop(); video.srcObject = null; };
       track.addEventListener("ended", stop);
       return stop;
@@ -142,5 +154,5 @@ contextBridge.executeInMainWorld({
       // Storage refused (opaque origin): nothing to fix.
     }
   },
-  args: [locale],
+  args: [early.locale ?? navigator.language],
 });

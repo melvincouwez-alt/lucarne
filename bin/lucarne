@@ -319,6 +319,8 @@ def main(argv):
     elif cmd == "config" and rest[:2] == ["set", "language"] and len(rest) == 3:
         try:
             lucarne_config.set_language(rest[2])
+        except lucarne_config.ConfigUnreadable:
+            sys.exit(_("config.json est illisible : rien n'a été enregistré (copie gardée dans config.json.bak)"))
         except ValueError:
             sys.exit(_("Langue inconnue : {value} (auto, fr ou en)", value=rest[2]))
     elif cmd == "config" and rest[:1] == ["set"] and len(rest) == 4:
@@ -329,6 +331,8 @@ def main(argv):
             pass  # texte brut : « vm », « web »…
         try:
             lucarne_config.set_value(app, key, value)
+        except lucarne_config.ConfigUnreadable:
+            sys.exit(_("config.json est illisible : rien n'a été enregistré (copie gardée dans config.json.bak)"))
         except ValueError:
             sys.exit(_("Réglage inconnu : {app} {key}", app=app, key=key))
     elif cmd == "status":

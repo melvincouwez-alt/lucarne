@@ -13,7 +13,7 @@ import { appFromArgv, command, CONFIG_DIR, desktopId } from "./identity";
 import { loadConfig, updateConfig, watchConfig, type AppConfig } from "./config";
 import { BACKGROUNDS_DIR, enableBackgrounds, registerBackgroundScheme } from "./backgrounds";
 import { applyNetwork, closeEnterprise, enableIntune, enableSmartcardPin, watchSignIn } from "./enterprise";
-import { trimCache } from "./housekeeping";
+import { HTTP_SHARE, trimCache } from "./housekeeping";
 import { ask } from "./panel";
 import { enableWebAuthn, patchSignIn } from "./webauthn";
 import { mayUseDevices, isInside, urlFrom } from "./links";
@@ -33,13 +33,15 @@ const info = appFromArgv(process.argv);
 
 app.setName(info.name);
 app.setPath("userData", path.join(CONFIG_DIR, "apps", info.id));
-// WebRTCPipeWireCapturer: screen sharing through the xdg-desktop-portal picker on Wayland.
-// The VA-API features move video decoding (calls, shared screens) to the GPU;
-// without them the renderer does it all and the picture lags. Encoding stays
-// in software: the VA-API encoder on the AMD iGPU sent green-striped camera
+// Electron 44 (Chromium 152) already runs on Wayland with the frame drawn by
+// Chromium, and shares the screen through the xdg-desktop-portal (PipeWire):
+// UseOzonePlatform, WaylandWindowDecorations, WebRTCPipeWireCapturer and
+// VaapiVideoDecoder no longer exist there and were dropped. The VA-API
+// features move video decoding (calls, shared screens) to the GPU; without
+// them the renderer does it all and the picture lags. Encoding stays in
+// software: the VA-API encoder on the AMD iGPU sent green-striped camera
 // frames and broke screen sharing (0.1.5/0.1.6).
-const VIDEO = "VaapiVideoDecoder,AcceleratedVideoDecodeLinuxGL,AcceleratedVideoDecodeLinuxZeroCopyGL";
-app.commandLine.appendSwitch("enable-features", `UseOzonePlatform,WaylandWindowDecorations,WebRTCPipeWireCapturer,${VIDEO}`);
+app.commandLine.appendSwitch("enable-features", "AcceleratedVideoDecodeLinuxGL,AcceleratedVideoDecodeLinuxZeroCopyGL");
 app.commandLine.appendSwitch("enable-gpu-rasterization");
 // HardwareMediaKeyHandling: the media keys stay with the music player, not a call.
 app.commandLine.appendSwitch("disable-features", "WaylandWpColorManagerV1,HardwareMediaKeyHandling");
@@ -75,6 +77,9 @@ if (!devProbeHidden() && !app.requestSingleInstanceLock()) {
 }
 
 if (conf.windowsMode) app.userAgentFallback = userAgent(true);
+// Chromium keeps the HTTP cache under its share of the limit itself, oldest
+// entries first, instead of it being wiped whole (src/housekeeping.ts).
+if (conf.cacheLimit > 0) app.commandLine.appendSwitch("disk-cache-size", String(Math.min(2 ** 31 - 1, Math.floor(conf.cacheLimit * HTTP_SHARE * 1024 * 1024))));
 trimCache(app.getPath("userData"), conf.cacheLimit);
 let accent = systemAccent();
 let status: Availability | "" = "";
@@ -91,6 +96,7 @@ const shell: Shell = {
   quitting: false,
   teams: null,
   badge: () => pollBadge(),
+  failed: () => retryLater(),
   teamsMenu: () => teamsMenu(),
   openProfile: (index) => void openProfile(index),
   signIn: (contents) => signIn(contents),
@@ -133,17 +139,34 @@ function handleLaunch(url: string | null): void {
   if (url) win.load(url);
 }
 
-/** Unread count: "(3) …" in the title (Teams), or Outlook's Inbox folder. */
-const UNREAD_JS = `(() => {
-  const m = document.title.match(/^\\((\\d+)\\)/);
-  if (m) return +m[1];
-  for (const el of document.querySelectorAll('[role="treeitem"][aria-label], [role="treeitem"] [title]')) {
-    const label = el.getAttribute("aria-label") || el.getAttribute("title") || "";
-    const k = label.match(/^(Boîte de réception|Inbox)\\D*(\\d+)\\s*(élément|non lu|unread)/i);
-    if (k) return +k[2];
+/**
+ * Outlook's Inbox folder in its folder tree. The count used to be in an
+ * aria-label or a title; Outlook now (October 2026) writes it as hidden text
+ * ("Boîte de réceptionsélectionné27non lus") after its icon-font glyphs, so
+ * the old labels found nothing and the badge stayed empty.
+ */
+const INBOX_JS = `(() => {
+  const INBOX = /^[^\\p{L}\\d]*(Boîte de réception|Inbox)\\D*?(\\d+)\\s*(élément|non lu|unread)/iu;
+  for (const el of document.querySelectorAll('[role="treeitem"]')) {
+    const labels = [el.getAttribute("aria-label"), ...[...el.querySelectorAll("[title]")].map((t) => t.getAttribute("title")), el.textContent];
+    for (const label of labels) {
+      const k = label && label.match(INBOX);
+      if (k) return +k[2];
+    }
   }
   return 0;
 })()`;
+
+/**
+ * Unread count: "(3) …" in the title (Teams), read here without asking the
+ * page, or Outlook's Inbox folder. Teams' chat list is made of tree items
+ * too: scanning it every 5 s found nothing and cost a round trip to the page.
+ */
+function unread(page: WebContents): Promise<unknown> {
+  const m = page.getTitle().match(/^\((\d+)\)/);
+  if (m) return Promise.resolve(+m[1]);
+  return info.id === "outlook" ? page.executeJavaScript(INBOX_JS).catch(() => 0) : Promise.resolve(0);
+}
 
 function pollBadge(): void {
   const pages = [...shell.windows].map((w) => w.view.webContents).filter((p) => !p.isDestroyed());
@@ -153,7 +176,7 @@ function pollBadge(): void {
     return;
   }
   // Every account counts.
-  void Promise.all(pages.map((p) => p.executeJavaScript(UNREAD_JS).catch(() => 0)))
+  void Promise.all(pages.map(unread))
     .then((counts: unknown[]) => {
       const count = counts.reduce<number>((n, c) => n + (typeof c === "number" ? c : 0), 0);
       setBadge(conf.badge ? count : 0);
@@ -266,13 +289,22 @@ async function addProfile(): Promise<void> {
   const id = `${Date.now().toString(36)}`;
   const profiles = [...conf.profiles, { id, name: name.trim() }];
   conf = { ...conf, profiles };
-  updateConfig(info, { profiles });
+  save({ profiles });
   await openProfile(profiles.length + 1);
 }
 
 function report(title: string, body: string): void {
   if (!Notification.isSupported()) return;
   new Notification({ title, body, icon: path.join(__dirname, "..", "assets", "icons", `${info.id}.png`) }).show();
+}
+
+/** A change made from the app's menus; told when config.json could not take it. */
+function save(patch: Partial<AppConfig>): void {
+  try {
+    updateConfig(info, patch);
+  } catch (err) {
+    report(t("Réglage non enregistré"), (err as Error).message);
+  }
 }
 
 function setStatus(availability: Availability | null): void {
@@ -333,7 +365,7 @@ function teamsMenu(): MenuItemConstructorOptions[] {
           label: t("Style elementary"),
           type: "checkbox",
           checked: conf.elementaryCss,
-          click: () => updateConfig(info, { elementaryCss: !conf.elementaryCss }),
+          click: () => save({ elementaryCss: !conf.elementaryCss }),
         },
         {
           label: t("Mon style (CSS)…"),
@@ -382,10 +414,7 @@ ipcMain.on("lucarne-page:preview", (event: IpcMainEvent, frame: unknown) => {
   if (typeof frame === "string" && frame.length < 2_000_000) windowOf(event.sender)?.setPreview(frame);
 });
 ipcMain.on("lucarne-page:early", (event: IpcMainEvent) => {
-  event.returnValue = { windowsMode: conf.windowsMode, lockDevices: conf.lockDevices, webauthn: conf.webauthn, sharePreview: conf.sharePreview };
-});
-ipcMain.on("lucarne-page:locale", (event: IpcMainEvent) => {
-  event.returnValue = LOCALE;
+  event.returnValue = { locale: LOCALE, windowsMode: conf.windowsMode, lockDevices: conf.lockDevices, webauthn: conf.webauthn, sharePreview: conf.sharePreview };
 });
 // Our own pages (header bar, small windows): language and dictionary.
 ipcMain.on("lucarne-i18n", (event: IpcMainEvent) => {
@@ -444,7 +473,11 @@ app.whenReady().then(async () => {
   started = true;
 
   applyTray();
-  badgeTimer = setInterval(pollBadge, 5000);
+  // The title says Teams' count (page-title-updated); Outlook's count is in
+  // its folder tree and Teams' status on its avatar, read now and then. The
+  // other apps have nothing to read.
+  const every = info.id === "outlook" ? 15_000 : info.id === "teams" ? 30_000 : 0;
+  if (every) badgeTimer = setInterval(pollBadge, every);
   stopWatch = watchConfig(info, (next) => {
     const network = next.proxy !== conf.proxy || next.caFingerprints.join() !== conf.caFingerprints.join();
     const lang = resolveLanguage(next.language);
@@ -472,10 +505,18 @@ app.whenReady().then(async () => {
   });
   // Back from suspend, or the network returns: pages that failed to load retry.
   powerMonitor.on("resume", () => setTimeout(retryFailed, 3000));
-  setInterval(() => {
-    if ([...shell.windows].some((w) => w.failed) && net.isOnline()) retryFailed();
-  }, 10_000);
 }).catch((err: unknown) => onCrash(err instanceof Error ? err : new Error(String(err)), true));
+
+/** A page failed to load: tried again every 10 s while the network is up, until none has failed. */
+let retryTimer: NodeJS.Timeout | null = null;
+function retryLater(): void {
+  retryTimer ??= setInterval(() => {
+    if (![...shell.windows].some((w) => w.failed)) {
+      if (retryTimer) clearInterval(retryTimer);
+      retryTimer = null;
+    } else if (net.isOnline()) retryFailed();
+  }, 10_000);
+}
 
 function retryFailed(): void {
   for (const w of shell.windows) if (w.failed) w.action("retry", null);

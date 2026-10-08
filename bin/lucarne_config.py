@@ -117,12 +117,26 @@ def app_defaults(app):
     return d
 
 
-def _read_raw():
+class ConfigUnreadable(OSError):
+    """config.json existe mais ne se lit pas : il n'est jamais remplacé (copie dans config.json.bak)."""
+
+
+def _read_raw(strict=False):
+    """Contenu du fichier ; strict (avant une écriture) : un fichier illisible lève ConfigUnreadable
+    au lieu d'être remplacé par un fichier qui ne contiendrait que le changement."""
     try:
         raw = json.loads(CONFIG.read_text())
-        return raw if isinstance(raw, dict) else {}
-    except (OSError, ValueError):
+    except FileNotFoundError:
         return {}
+    except (OSError, ValueError):
+        raw = None
+    if not strict or (isinstance(raw, dict) and isinstance(raw.get("apps", {}), dict)):
+        return raw if isinstance(raw, dict) else {}
+    try:
+        shutil.copyfile(CONFIG, CONFIG.with_name("config.json.bak"))
+    except OSError:
+        pass
+    raise ConfigUnreadable(str(CONFIG))
 
 
 def load():
@@ -171,7 +185,7 @@ def _write_json(data):
 
 def save(config):
     """Écrit seulement ce qui diffère des valeurs par défaut, en gardant les clés inconnues."""
-    raw = _read_raw()
+    raw = _read_raw(strict=True)
     old_apps = raw.get("apps") if isinstance(raw.get("apps"), dict) else {}
     apps = {}
     for app, c in config["apps"].items():

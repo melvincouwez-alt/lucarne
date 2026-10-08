@@ -173,9 +173,6 @@ function tabSetDel(name, tabId) {
   });
 }
 
-chrome.webNavigation.onCommitted.addListener(d => {
-  if (d.frameId === 0 && /^https?:/.test(d.url)) tabSetAdd("visited", d.tabId);
-});
 chrome.tabs.onRemoved.addListener(id => {
   tabSetDel("visited", id);
   tabSetDel("exempt", id);
@@ -249,9 +246,12 @@ chrome.webNavigation.onBeforeNavigate.addListener(async d => {
   if (toHost(msg)) back(d.tabId);
 });
 
-// Filet de sécurité : marqueur vu seulement au moment où la page s'engage
+// Page principale engagée : l'onglet a désormais un historique (visited), et
+// filet de sécurité pour le marqueur vu seulement à ce moment-là
 chrome.webNavigation.onCommitted.addListener(d => {
-  if (d.frameId === 0) markExempt(d);
+  if (d.frameId !== 0) return;
+  if (/^https?:/.test(d.url)) tabSetAdd("visited", d.tabId);
+  markExempt(d);
 });
 
 // ------------------------------------------------------------ fenêtre de l'extension

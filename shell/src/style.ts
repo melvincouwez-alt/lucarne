@@ -58,18 +58,22 @@ export function brandScript(app: AppInfo, accent: string | null): string | null 
   const all = () => document.querySelectorAll(".fui-FluentProvider").forEach(paint);
   window.__lucarneAccent = accent;
   all();
-  if (window.__lucarneBrandObserver) return;
-  let queued = false;
-  window.__lucarneBrandObserver = new MutationObserver(() => {
-    if (queued) return;
-    queued = true;
-    setTimeout(() => {
-      queued = false;
-      accent = window.__lucarneAccent;
-      all();
-    }, 500);
-  });
-  window.__lucarneBrandObserver.observe(document.documentElement, { childList: true, subtree: true });
+  let watch = window.__lucarneBrandObserver;
+  if (!watch) {
+    let queued = false;
+    watch = window.__lucarneBrandObserver = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      setTimeout(() => {
+        queued = false;
+        accent = window.__lucarneAccent;
+        all();
+      }, 500);
+    });
+  }
+  // Without the accent there is nothing to paint on new providers: no watch.
+  if (accent) watch.observe(document.documentElement, { childList: true, subtree: true });
+  else watch.disconnect();
 })(${JSON.stringify(accent)});`;
 }
 

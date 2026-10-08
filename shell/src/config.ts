@@ -5,7 +5,7 @@
 import fs from "fs";
 import path from "path";
 import { CONFIG_DIR, type AppInfo } from "./identity";
-import type { LanguageSetting } from "./i18n";
+import { t, type LanguageSetting } from "./i18n";
 
 export interface AppConfig {
   home: string;
@@ -161,17 +161,30 @@ export function watchConfig(app: AppInfo, onChange: (conf: AppConfig) => void): 
   };
 }
 
-/** Changes some of this app's settings in config.json, keeping everything else. */
+/**
+ * Changes some of this app's settings in config.json, keeping everything else.
+ * A file that cannot be read or parsed is never replaced by one holding only
+ * this change: it is copied to config.json.bak and the change is refused.
+ */
 export function updateConfig(app: AppInfo, patch: Partial<AppConfig>): void {
-  let raw: { apps?: Record<string, Record<string, unknown>> } & Record<string, unknown> = {};
+  let raw: unknown = {};
   try {
     raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
-  } catch {
-    raw = {};
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") raw = null;
   }
-  raw.apps ??= {};
+  const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+  if (!object(raw) || (raw.apps !== undefined && !object(raw.apps))) {
+    try {
+      fs.copyFileSync(FILE, `${FILE}.bak`);
+    } catch {
+      // unreadable: nothing to copy either
+    }
+    throw new Error(t("config.json est illisible : rien n'a été enregistré (copie gardée dans config.json.bak)"));
+  }
+  const apps = (raw.apps ??= {}) as Record<string, Record<string, unknown>>;
   const { language: _shared, ...own } = patch;
-  raw.apps[app.id] = { ...(raw.apps[app.id] ?? {}), ...own };
+  apps[app.id] = { ...(apps[app.id] ?? {}), ...own };
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
   // The file holds the sign-in address and password command: user only, and
   // replaced in one step so the other apps never read half a file.

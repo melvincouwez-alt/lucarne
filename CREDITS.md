@@ -1,56 +1,99 @@
-# Sources and credits
+# Sources et crédits
 
-Lucarne builds on other people's work. This file lists what comes from elsewhere, under which
-license, and what was taken from it.
+Lucarne s'appuie sur le travail d'autres personnes. Ce fichier liste ce qui vient d'ailleurs,
+sous quelle licence, et ce qui en a été repris.
 
-## Code included in the repository
+## Code inclus dans le dépôt
 
-| Part | Origin | License | Where |
+| Partie | Origine | Licence | Emplacement |
 |---|---|---|---|
-| WebAuthn / FIDO2 module (security keys at sign-in) | [teams-for-linux](https://github.com/IsmaelMartinez/teams-for-linux) by Ismael Martinez and contributors, commit `49ba4148` | GPL-3.0 | `shell/vendor/teams-for-linux/webauthn/` (unmodified copy, license included) |
-| RNNoise LADSPA plugin (noise-cancelling microphone) | [noise-suppression-for-voice](https://github.com/werman/noise-suppression-for-voice) by werman, v1.10 | GPL-3.0 | `shell/native/librnnoise_ladspa.so` (binary released by the project) |
-| RNNoise neural network, built into the plugin | [RNNoise](https://github.com/xiph/rnnoise) by Jean-Marc Valin / Xiph.Org | BSD-3-Clause | inside the same binary |
+| Module WebAuthn / FIDO2 (clés de sécurité à la connexion) | [teams-for-linux](https://github.com/IsmaelMartinez/teams-for-linux) d'Ismael Martinez et ses contributeurs, commit `49ba4148` | GPL-3.0 | `shell/vendor/teams-for-linux/webauthn/` (copie non modifiée, licence jointe) |
+| Greffon LADSPA RNNoise (micro antibruit) | [noise-suppression-for-voice](https://github.com/werman/noise-suppression-for-voice) de werman, v1.10 | GPL-3.0 | `shell/native/librnnoise_ladspa.so` (binaire publié par le projet) |
+| Réseau de neurones RNNoise, intégré au greffon | [RNNoise](https://github.com/xiph/rnnoise) de Jean-Marc Valin / Xiph.Org | BSD-3-Clause (texte ci-dessous) | dans le même binaire |
 
-## Ideas and methods
+## Idées et méthodes
 
-- **teams-for-linux** was the reference for much of the Teams work: reading call and presence
-  events from the page, microphone and camera fixes, company network settings (proxy,
-  certificates, smart cards, Intune), custom backgrounds, the `ERR_QUIC_PROTOCOL_ERROR`
-  workaround (issue #2518). Lucarne's code is written separately in TypeScript, except for the
-  WebAuthn module above. Thank you to Ismael Martinez and everyone who contributed to it.
-- **elementary OS**: colour palette, icon style (lighting, 1 px strokes), header bar and the
-  [Human Interface Guidelines](https://docs.elementary.io/hig). Accent colours are read from the
-  `io.elementary.stylesheet.*` theme.
-- **Granite** and **GTK 4** for the settings app.
-- **Inter** by Rasmus Andersson (SIL Open Font License 1.1) replaces Segoe UI in the pages when
-  it is installed. Lucarne does not ship it.
+- **teams-for-linux** a servi de référence pour une grande partie du travail sur Teams :
+  lecture des événements d'appel et de présence dans la page, correctifs du micro et de la
+  caméra, réglages des réseaux d'entreprise (proxy, certificats, cartes à puce, Intune), fonds
+  personnalisés, contournement de `ERR_QUIC_PROTOCOL_ERROR` (ticket #2518). Le code de Lucarne
+  est écrit à part en TypeScript, sauf le module WebAuthn ci-dessus. Merci à Ismael Martinez et
+  à tous ceux qui y ont contribué.
+- **elementary OS** : style des icônes (éclairage, filets de 1 px, palette), barre de titre et
+  [Human Interface Guidelines](https://docs.elementary.io/hig). Les couleurs d'accent sont lues
+  dans le thème `io.elementary.stylesheet.*`. Aucun fichier d'icône d'elementary n'est copié :
+  les icônes de Lucarne sont générées par `icons/deux_plans.py`.
+- **Granite** et **GTK 4** pour l'application de réglages.
+- **Inter** de Rasmus Andersson (SIL Open Font License 1.1) remplace Segoe UI dans les pages
+  quand elle est installée. Lucarne ne la fournit pas.
 
-## Dependencies
+## Dépendances
 
-| Package | License |
+| Paquet | Licence |
 |---|---|
-| [Electron](https://github.com/electron/electron) | MIT |
+| [Electron](https://github.com/electron/electron) | MIT (le paquet `.deb` contient les licences de Chromium fournies par Electron) |
 | [electron-builder](https://github.com/electron-userland/electron-builder) | MIT |
 | [TypeScript](https://github.com/microsoft/TypeScript) | Apache-2.0 |
 | [@holusion/dbus-next](https://github.com/Holusion/node-dbus-next) | MIT |
 | [cbor-x](https://github.com/kriszyp/cbor-x) | MIT |
-| [PyGObject](https://gitlab.gnome.org/GNOME/pygobject) | LGPL-2.1-or-later |
-| PipeWire (`pipewire-bin`, noise filter) | MIT |
-| `fido2-tools` (libfido2, Yubico), optional | BSD-2-Clause |
+| [PyGObject](https://gitlab.gnome.org/GNOME/pygobject) | LGPL-2.1 ou ultérieure |
+| PipeWire (`pipewire-bin`, filtre antibruit) | MIT |
+| `fido2-tools` (libfido2, Yubico), facultatif | BSD-2-Clause |
 
-## Sister project
+## Projet voisin
 
-[Vasistas](https://github.com/melvincouwez-alt/vasistas) (MIT) runs Windows applications one
-window at a time from a virtual machine. The two projects share no code; see the README for how
-they connect.
+[Vasistas](https://github.com/melvincouwez-alt/vasistas) (MIT) affiche les applications
+Windows d'une machine virtuelle fenêtre par fenêtre. Les deux projets ne partagent aucun code ;
+le README explique comment ils communiquent.
 
-## Trademarks
+## Marques
 
-Microsoft, Microsoft 365, Word, Excel, PowerPoint, OneNote, Outlook, Teams, Power BI,
-SharePoint and OneDrive are trademarks of Microsoft Corporation. Lucarne is an independent
-project, not affiliated with or endorsed by Microsoft. It shows Microsoft's web services as
-Microsoft serves them, with the user's own account, and contains no Microsoft code or images.
-Product names are only used to say which service opens in which window. Lucarne's icons are
-generic pictograms drawn for the project.
+Microsoft, Microsoft 365, Office, Word, Excel, PowerPoint, OneNote, Outlook, Teams, Power BI,
+SharePoint et OneDrive sont des marques de Microsoft Corporation. Lucarne est un projet
+indépendant, non affilié à Microsoft et non approuvé par Microsoft. Il affiche les services web
+de Microsoft tels que Microsoft les sert, avec le compte de l'utilisateur, et ne contient ni
+code, ni image, ni police de Microsoft. Les noms de produits servent seulement à dire quel
+service s'ouvre dans quelle fenêtre. Les icônes de Lucarne sont des dessins originaux faits
+pour le projet, sans logo ni lettre de Microsoft.
 
-elementary and Pantheon are trademarks of elementary, Inc. Lucarne is not an elementary project.
+elementary et Pantheon sont des marques d'elementary, Inc. Lucarne n'est pas un projet
+elementary.
+
+## Texte de licence de RNNoise
+
+Texte d'origine, en anglais, tel que le demande la licence BSD-3-Clause pour une distribution
+sous forme binaire.
+
+```
+Copyright (c) 2017, Mozilla
+Copyright (c) 2007-2017, Jean-Marc Valin
+Copyright (c) 2005-2017, Xiph.Org Foundation
+Copyright (c) 2003-2004, Mark Borgerding
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+- Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+- Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+- Neither the name of the Xiph.Org Foundation nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION
+OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```

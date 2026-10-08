@@ -3,53 +3,61 @@
 // connection kept for the app's lifetime: a dock drops a badge when the name
 // that sent it leaves the bus.
 
-import dbus from "@holusion/dbus-next";
+import type dbusModule from "@holusion/dbus-next";
 
-type Props = Record<string, InstanceType<typeof dbus.Variant>>;
+type DBus = typeof dbusModule;
+type Props = Record<string, InstanceType<DBus["Variant"]>>;
 
-class LauncherEntry extends dbus.interface.Interface {
-  count = 0;
-  /** Download progress, 0..1, or -1 for none. */
-  progress = -1;
-  uri = "";
+// dbus-next is loaded on the first badge or download, not at start: it cost
+// about 25 ms of every launch, including the ones that only raise the window.
+function launcherEntry(dbus: DBus) {
+  class LauncherEntry extends dbus.interface.Interface {
+    count = 0;
+    /** Download progress, 0..1, or -1 for none. */
+    progress = -1;
+    uri = "";
 
-  props(): Props {
-    return {
-      count: new dbus.Variant("x", this.count),
-      "count-visible": new dbus.Variant("b", this.count > 0),
-      progress: new dbus.Variant("d", Math.max(0, this.progress)),
-      "progress-visible": new dbus.Variant("b", this.progress >= 0),
-    };
+    props(): Props {
+      return {
+        count: new dbus.Variant("x", this.count),
+        "count-visible": new dbus.Variant("b", this.count > 0),
+        progress: new dbus.Variant("d", Math.max(0, this.progress)),
+        "progress-visible": new dbus.Variant("b", this.progress >= 0),
+      };
+    }
+
+    Update(): [string, Props] {
+      return [this.uri, this.props()];
+    }
+
+    Query(): [string, Props] {
+      return [this.uri, this.props()];
+    }
   }
 
-  Update(): [string, Props] {
-    return [this.uri, this.props()];
-  }
-
-  Query(): [string, Props] {
-    return [this.uri, this.props()];
-  }
+  LauncherEntry.configureMembers({
+    methods: { Query: { outSignature: "sa{sv}" } },
+    signals: { Update: { signature: "sa{sv}" } },
+  });
+  return new LauncherEntry("com.canonical.Unity.LauncherEntry");
 }
 
-LauncherEntry.configureMembers({
-  methods: { Query: { outSignature: "sa{sv}" } },
-  signals: { Update: { signature: "sa{sv}" } },
-});
-
-let entry: LauncherEntry | null = null;
-let bus: ReturnType<typeof dbus.sessionBus> | null = null;
+let entry: ReturnType<typeof launcherEntry> | null = null;
+let bus: ReturnType<DBus["sessionBus"]> | null = null;
 let desktop = "";
 
 export function initBadge(desktopId: string): void {
   desktop = desktopId;
 }
 
-function ensure(): LauncherEntry | null {
+function ensure(): typeof entry {
   if (entry) return entry;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dbus = require("@holusion/dbus-next") as DBus;
     bus = dbus.sessionBus();
     bus.on("error", () => undefined);
-    entry = new LauncherEntry("com.canonical.Unity.LauncherEntry");
+    entry = launcherEntry(dbus);
     entry.uri = `application://${desktop}.desktop`;
     bus.export(`/io/github/melvincouwez/lucarne/${desktop.replace(/\W/g, "_")}`, entry);
   } catch {

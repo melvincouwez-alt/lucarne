@@ -9,7 +9,7 @@
 
 import { exec } from "child_process";
 import { X509Certificate } from "crypto";
-import dbus from "@holusion/dbus-next";
+import type dbusModule from "@holusion/dbus-next";
 import { app, type Session, type WebContents } from "electron";
 import type { AppConfig } from "./config";
 import { ask } from "./panel";
@@ -101,10 +101,13 @@ export function enableSmartcardPin(): void {
 // ---------- Intune (Microsoft Identity Broker)
 
 const BROKER = { destination: "com.microsoft.identity.broker1", path: "/com/microsoft/identity/broker1", interface: "com.microsoft.identity.Broker1" };
-let brokerBus: ReturnType<typeof dbus.sessionBus> | null = null;
+let brokerBus: ReturnType<typeof dbusModule.sessionBus> | null = null;
 let brokerAccount: Record<string, unknown> | null = null;
 
 async function broker(member: string, request: unknown): Promise<Record<string, unknown>> {
+  // Loaded only on Intune devices (src/badge.ts says why).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const dbus = require("@holusion/dbus-next") as typeof dbusModule;
   brokerBus ??= dbus.sessionBus();
   const reply = await brokerBus.call(new dbus.Message({ ...BROKER, member, signature: "sss", body: ["0.0", "", JSON.stringify(request)] }));
   return JSON.parse(String(reply?.body?.[0] ?? "{}")) as Record<string, unknown>;
