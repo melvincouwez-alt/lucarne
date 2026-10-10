@@ -5,11 +5,11 @@ const TEXT = {
   fr: {
     title: "Lucarne : renvoi des liens",
     toggle: "Renvoyer les liens hors de Chrome",
-    hint: "Pour chaque appli, où s'ouvrent les liens cliqués dans Chrome : dans l'appli en ligne ou dans l'appli Windows de la VM (Vasistas).",
-    warn: "Hôte natif injoignable : relancer Chrome ou réinstaller Lucarne.",
+    hint: "Choisissez, pour chaque application, où s'ouvrent les liens cliqués dans Chrome : dans l'application en ligne ou dans l'application Windows de la VM (Vasistas).",
+    warn: "L'hôte natif de Lucarne ne répond pas. Relancez Chrome ou réinstallez Lucarne.",
     web: "En ligne",
     vm: "VM Windows",
-    noVm: "Pas disponible dans la VM",
+    noVm: "Non disponible dans la VM",
   },
   en: {
     title: "Lucarne: link sending",

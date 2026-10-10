@@ -17,7 +17,7 @@ sous quelle licence, et ce qui en a été repris.
   lecture des événements d'appel et de présence dans la page, correctifs du micro et de la
   caméra, réglages des réseaux d'entreprise (proxy, certificats, cartes à puce, Intune), fonds
   personnalisés, contournement de `ERR_QUIC_PROTOCOL_ERROR` (ticket #2518). Le code de Lucarne
-  est écrit à part en TypeScript, sauf le module WebAuthn ci-dessus. Merci à Ismael Martinez et
+  est écrit séparément en TypeScript, sauf le module WebAuthn ci-dessus. Merci à Ismael Martinez et
   à tous ceux qui y ont contribué.
 - elementary OS : style des icônes (éclairage, filets de 1 px, palette de couleurs, sauf pour
   Outlook qui a un bleu denim propre au projet, plus éloigné du bleu de Word), barre de titre et
@@ -53,8 +53,8 @@ Microsoft, Microsoft 365, Office, Word, Excel, PowerPoint, OneNote, Outlook, Tea
 SharePoint et OneDrive sont des marques de Microsoft Corporation. Lucarne est un projet
 indépendant, non affilié à Microsoft et non approuvé par Microsoft. Il affiche les services web
 de Microsoft tels que Microsoft les sert, avec le compte de l'utilisateur, et ne contient ni
-code, ni image, ni police de Microsoft. Les noms de produits servent seulement à dire quel
-service s'ouvre dans quelle fenêtre. Les icônes de Lucarne sont des dessins originaux faits
+code, ni image, ni police de Microsoft. Les noms de produits servent seulement à indiquer quel
+service s'ouvre dans quelle fenêtre. Les icônes de Lucarne sont des dessins originaux créés
 pour le projet, sans logo ni lettre de Microsoft.
 
 elementary et Pantheon sont des marques d'elementary, Inc. Lucarne n'est pas un projet

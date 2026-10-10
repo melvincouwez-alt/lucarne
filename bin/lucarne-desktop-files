@@ -98,7 +98,7 @@ def settings_entry(settings):
         "Name=Lucarne Settings",
         "Name[fr]=Réglages de Lucarne",
         "GenericName=Web App Settings",
-        "GenericName[fr]=Réglages des applis web",
+        "GenericName[fr]=Réglages des applications web",
         "Comment=Home pages, notifications, dock and window style of the Lucarne apps",
         "Comment[fr]=Pages d'accueil, notifications, dock et style des fenêtres Lucarne",
         f"Exec={settings}",
